@@ -1,11 +1,7 @@
 {
-  "buildCommand": "",
+  "version": 2,
+  "buildCommand": "echo 'Build complete'",
   "outputDirectory": ".",
-  "framework": "static",
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/billing.html"
-    }
-  ]
+  "public": true,
+  "cleanUrls": false
 }

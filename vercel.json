@@ -1,7 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "echo 'Build complete'",
-  "outputDirectory": ".",
   "public": true,
-  "cleanUrls": false
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/billing.html"
+    }
+  ]
 }

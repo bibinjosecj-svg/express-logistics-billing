@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Express Logistics — Billing</title>
+<style>
+  :root{
+    --bg:#eef1f5; --card:#fff; --ink:#1b2733; --muted:#64748b;
+    --line:#e3e8ef; --line-2:#cbd5e1;
+    --brand:#0b2545; --brand-2:#13315c; --accent:#1c7ed6; --accent-d:#1565b3;
+    --gold:#b88a2e;
+    --ok:#0f9d58; --ok-d:#0c7d46; --danger:#d64545; --warn:#b7791f;
+    --radius:14px; --radius-sm:9px;
+    --shadow-sm:0 1px 2px rgba(16,24,40,.06);
+    --shadow:0 1px 3px rgba(16,24,40,.08),0 8px 24px rgba(16,24,40,.06);
+    --shadow-lg:0 12px 40px rgba(11,37,69,.16);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Inter","Segoe UI",Roboto,system-ui,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;
+    -webkit-font-smoothing:antialiased}
+  h1,h2,h3{margin:0;letter-spacing:-.01em}
+  button{font-family:inherit;cursor:pointer}
+  input,select,textarea{font-family:inherit;font-size:14px}
+
+  /* ---------- Top bar ---------- */
+  header.topbar{position:sticky;top:0;z-index:50;
+    background:linear-gradient(120deg,var(--brand) 0%,var(--brand-2) 100%);
+    color:#fff;display:flex;align-items:center;gap:16px;padding:14px 26px;
+    box-shadow:var(--shadow);border-bottom:3px solid var(--gold)}
+  header.topbar .brand-wrap{display:flex;align-items:center;gap:13px}
+  header.topbar .brand-logo{height:42px;width:42px;border-radius:9px;object-fit:contain;
+    background:#fff;padding:4px;box-shadow:var(--shadow-sm);display:none}
+  header.topbar h1{font-size:18px;font-weight:700;letter-spacing:.2px}
+  header.topbar .tag{font-size:11.5px;opacity:.72;letter-spacing:.4px;text-transform:uppercase}
+  nav.tabs{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+  nav.tabs button{background:rgba(255,255,255,.10);color:#dce6f2;border:0;padding:9px 17px;
+    border-radius:9px;font-size:13.5px;font-weight:600;transition:.15s}
+  nav.tabs button:hover{background:rgba(255,255,255,.20);color:#fff}
+  nav.tabs button.active{background:#fff;color:var(--brand);box-shadow:var(--shadow-sm)}
+  main{max-width:1080px;margin:26px auto;padding:0 18px}
+  .view{display:none}
+  .view.active{display:block;animation:fade .22s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:22px 24px;margin-bottom:20px}
+  .card h2{font-size:13px;margin-bottom:18px;color:var(--brand);font-weight:700;
+    text-transform:uppercase;letter-spacing:.7px;display:flex;align-items:center;gap:9px;
+    padding-bottom:12px;border-bottom:1px solid var(--line)}
+  .accordion{display:flex;flex-direction:column;gap:14px}
+  .accordion-item{border:1px solid var(--line);border-radius:var(--radius);background:var(--card);box-shadow:var(--shadow);overflow:hidden}
+  .accordion-toggle{width:100%;border:none;background:linear-gradient(120deg,#f7fafc,#edf2f7);padding:18px 22px;text-align:left;font-size:15px;font-weight:700;color:var(--brand);display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;outline:none}
+  .accordion-toggle:hover{background:linear-gradient(120deg,#eef4fb,#e2ecf7)}
+  .accordion-toggle::after{content:'+';font-size:20px;line-height:1;transition:transform .2s ease}
+  .accordion-toggle.active::after{transform:rotate(45deg)}
+  .accordion-panel{display:none;padding:0 22px 22px}
+  .accordion-panel.active{display:block}
+  .accordion-panel .card-body{padding-top:16px}
+  .accordion-panel .hint{margin-bottom:12px}
+  .card h2 .ico{font-size:15px}
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:680px){.g2,.g3{grid-template-columns:1fr}}
+  label.field{display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:600;
+    color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+  label.field input,label.field select,label.field textarea{
+    border:1px solid var(--line-2);border-radius:var(--radius-sm);padding:10px 12px;
+    font-size:14px;font-weight:500;color:var(--ink);background:#fff;width:100%;
+    text-transform:none;letter-spacing:normal;transition:.15s}
+  label.field input::placeholder,label.field textarea::placeholder{color:#9aa7b6;font-weight:400}
+  label.field input:focus,label.field textarea:focus,label.field select:focus{
+    outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(28,126,214,.15)}
+  textarea{resize:vertical;min-height:62px}
+
+  .btn{border:0;border-radius:var(--radius-sm);padding:10px 18px;font-weight:600;font-size:14px;
+    background:#eef2f7;color:var(--ink);transition:.15s;border:1px solid transparent}
+  .btn:hover{filter:brightness(.98);transform:translateY(-1px)}
+  .btn:active{transform:none}
+  .btn.primary{background:linear-gradient(120deg,var(--accent),var(--accent-d));color:#fff;box-shadow:var(--shadow-sm)}
+  .btn.ok{background:linear-gradient(120deg,var(--ok),var(--ok-d));color:#fff;box-shadow:var(--shadow-sm)}
+  .btn.ghost{background:#fff;border:1px solid var(--line-2);color:var(--ink)}
+  .btn.danger{background:#fff;color:var(--danger);border:1px solid #f0c5c5}
+  .btn.danger:hover{background:#fdf0f0}
+  .btn.sm{padding:7px 13px;font-size:13px}
+  .row-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;align-items:center}
+
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);font-size:14px}
+  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+  tbody tr{transition:background .12s}
+  tbody tr:hover{background:#f7f9fc}
+  td.num,th.num{text-align:right}
+  .items thead th{background:#f7f9fc}
+  .items input,.items textarea{border:1px solid var(--line-2);border-radius:7px;padding:8px 9px;font-size:13px;width:100%}
+  .items input:focus,.items textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(28,126,214,.15)}
+  .items td{padding:6px;vertical-align:top}
+  .del-row{background:#fff;color:var(--danger);border:1px solid #f0c5c5;border-radius:7px;
+    width:32px;height:32px;font-size:17px;line-height:1;transition:.15s}
+  .del-row:hover{background:var(--danger);color:#fff}
+
+  .totals{margin-left:auto;width:340px;max-width:100%;background:#f7f9fc;border:1px solid var(--line);
+    border-radius:var(--radius-sm);padding:14px 18px;margin-top:8px}
+  .totals .line{display:flex;justify-content:space-between;padding:6px 0;font-size:14px;color:var(--muted)}
+  .totals .line b{color:var(--ink)}
+  .totals .grand{border-top:2px solid var(--brand);margin-top:8px;padding-top:12px;
+    font-size:19px;font-weight:800;color:var(--brand)}
+  .totals .grand span:last-child{color:var(--accent-d)}
+  .words{background:#fbf7ec;border:1px solid #ecd9a8;border-left:4px solid var(--gold);
+    border-radius:var(--radius-sm);padding:11px 14px;margin-top:14px;font-size:13.5px;color:#6b5418;font-weight:600}
+
+  /* ---------- Customer selector highlight ---------- */
+  .picker-box{background:linear-gradient(120deg,#f3f8ff,#eef4fc);border:1px solid #cfe0f5;
+    border-radius:var(--radius-sm);padding:16px 18px;margin-bottom:18px}
+  .picker-box label.field{color:var(--brand)}
+  .picker-box select{font-size:15px;font-weight:600;border-color:var(--accent);background:#fff}
+  .picker-note{font-size:12.5px;color:var(--accent-d);margin-top:8px;display:flex;align-items:center;gap:6px}
+  .selected-flag{display:none;background:#e6f4ea;color:var(--ok-d);border:1px solid #b6e0c2;
+    border-radius:20px;padding:4px 12px;font-size:12.5px;font-weight:600;align-items:center;gap:6px}
+  .selected-flag.show{display:inline-flex}
+
+  /* ---------- Professional data tables (Customers / Saved bills) ---------- */
+  .table-wrap{border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;box-shadow:var(--shadow-sm)}
+  table.pro{width:100%;border-collapse:collapse}
+  table.pro thead th{background:#f1f5fa;color:var(--brand);font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.5px;padding:13px 14px;text-align:left;border-bottom:2px solid var(--line-2)}
+  table.pro thead th.num{text-align:right}
+  table.pro tbody td{padding:13px 14px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:middle}
+  table.pro tbody tr:last-child td{border-bottom:0}
+  table.pro tbody tr:nth-child(even){background:#fafbfd}
+  table.pro tbody tr:hover{background:#eef4fc}
+  table.pro .c-name{font-weight:700;color:var(--ink)}
+  table.pro .c-sub{font-size:12px;color:var(--muted);margin-top:2px}
+  table.pro .addr{white-space:pre-line;color:var(--muted);font-size:13px;max-width:320px}
+  .gst-tag{display:inline-block;font-family:ui-monospace,"Courier New",monospace;font-size:12.5px;
+    background:#eef2f7;border:1px solid var(--line-2);border-radius:6px;padding:3px 8px;color:#334155}
+  .amt-tag{font-weight:700;color:var(--brand);font-variant-numeric:tabular-nums}
+  .inv-tag{display:inline-block;background:var(--brand);color:#fff;font-weight:700;font-size:12.5px;
+    border-radius:6px;padding:3px 10px;letter-spacing:.3px}
+  .tbl-actions{display:flex;gap:7px;justify-content:flex-end}
+  .icon-btn{border:1px solid var(--line-2);background:#fff;border-radius:7px;padding:6px 10px;
+    font-size:12.5px;font-weight:600;color:var(--ink);transition:.15s;display:inline-flex;align-items:center;gap:5px}
+  .icon-btn:hover{border-color:var(--accent);color:var(--accent-d);background:#f3f8ff}
+  .icon-btn.del:hover{border-color:var(--danger);color:var(--danger);background:#fdf0f0}
+
+  .empty{color:var(--muted);text-align:center;padding:34px;font-size:14px}
+  .pill{display:inline-block;background:#eef2f6;border-radius:20px;padding:3px 10px;font-size:12px;color:var(--muted)}
+  .logo-prev{height:56px;border:1px solid var(--line-2);border-radius:var(--radius-sm);padding:5px;background:#fff;object-fit:contain}
+  .hint{font-size:12.5px;color:var(--muted);font-weight:400}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:var(--brand);color:#fff;padding:13px 24px;border-radius:11px;
+    box-shadow:var(--shadow-lg);z-index:200;opacity:0;transition:.25s;pointer-events:none;font-weight:600}
+  .toast.show{opacity:1;bottom:34px}
+
+  /* ---------- Printable bill ---------- */
+  #print-area{display:none}
+  .bill{width:780px;margin:0 auto;background:#fff;color:#000;border:2px solid #000;font-size:13px}
+  .bill .b-title{text-align:center;font-weight:700;border-bottom:2px solid #000;padding:6px;letter-spacing:1px}
+  .bill .b-head{display:flex;border-bottom:2px solid #000}
+  .bill .b-company{flex:1;padding:8px;border-right:2px solid #000}
+  .bill .b-company .cname{font-size:18px;font-weight:800;line-height:1.15}
+  .bill .b-company .caddr{margin-top:4px;line-height:1.4}
+  .bill .b-meta{width:230px;padding:8px}
+  .bill .b-meta div{padding:3px 0;border-bottom:1px solid #999}
+  .bill .b-meta div:last-child{border:0}
+  .bill .b-to{padding:8px;border-bottom:2px solid #000;line-height:1.5}
+  .bill .b-to b{display:inline-block;min-width:34px}
+  .bill table.b-items{width:100%;border-collapse:collapse}
+  .bill table.b-items th,.bill table.b-items td{border:1px solid #000;padding:6px 8px;vertical-align:top;font-size:12.5px}
+  .bill table.b-items th{background:#dde6f0;font-weight:700;text-align:center;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .bill table.b-items tbody td{height:24px}
+  .bill table.b-items .r-no{text-align:center}
+  .bill table.b-items .r-amt{text-align:right;font-variant-numeric:tabular-nums}
+  .bill table.b-items tr.sum td{font-weight:700;background:#f4f6fa;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .bill table.b-items tr.grand td{font-weight:800;font-size:14px;background:#dde6f0;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .bill .b-foot{display:flex;border-top:2px solid #000}
+  .bill .b-bank{flex:1;padding:8px;border-right:2px solid #000;line-height:1.6}
+  .bill .b-sign{width:250px;padding:8px;text-align:center;display:flex;flex-direction:column;justify-content:space-between}
+  .bill .b-words{padding:6px 8px;border-top:2px solid #000;font-weight:600}
+  .bill .b-logo{height:48px;float:right;margin-left:8px}
+  .bill .seal{max-height:80px;margin:6px auto;display:block}
+
+  @media print{
+    body{background:#fff}
+    header.topbar,main,.toast{display:none !important}
+    #print-area{display:block !important}
+    .bill{border:2px solid #000;box-shadow:none;width:100%}
+    @page{size:A4;margin:12mm}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand-wrap">
+    <img id="brandLogo" class="brand-logo" alt="">
+    <div>
+      <h1 id="brandName">Billing</h1>
+      <div class="tag">Transport invoice maker</div>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button data-tab="create" class="active">📝 Create Bill</button>
+    <button data-tab="saved">📂 Saved Bills</button>
+    <button data-tab="customers">👥 Customers</button>
+    <button data-tab="settings">⚙️ Settings</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ============ CREATE BILL ============ -->
+  <section id="view-create" class="view active">
+    <div class="card">
+      <h2><span class="ico">🧾</span> Invoice details</h2>
+      <div class="grid g3">
+        <label class="field">Invoice No
+          <input id="invNo" type="text">
+        </label>
+        <label class="field">Financial Year
+          <input id="invFY" type="text" placeholder="2026-2027">
+        </label>
+        <label class="field">Date
+          <input id="invDate" type="date">
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="ico">👥</span> Bill to (Customer)</h2>
+
+      <div class="picker-box">
+        <label class="field">Select a customer
+          <select id="custPick"><option value="">— Choose a saved customer —</option></select>
+        </label>
+        <div class="picker-note">
+          <span>⤵️ Picking a customer auto-fills the name, address & GSTIN below.</span>
+          <span class="selected-flag" id="selectedFlag">✓ Loaded</span>
+        </div>
+      </div>
+
+      <div class="grid g2">
+        <label class="field">Customer name
+          <input id="custName" type="text" placeholder="M/s Pigments India Ltd">
+        </label>
+        <label class="field">GSTIN
+          <input id="custGst" type="text" placeholder="32AABCP4606P1ZC">
+        </label>
+      </div>
+      <label class="field" style="margin-top:16px">Address
+        <textarea id="custAddr" placeholder="Thazhekad P.O,&#10;Thrissur"></textarea>
+      </label>
+      <div class="row-actions">
+        <button class="btn ok sm" id="saveCustBtn">💾 Save / update this customer</button>
+        <span class="hint">New customer? Type the details, then save — it'll appear in the dropdown above.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="ico">📦</span> Items</h2>
+      <table class="items">
+        <thead>
+          <tr>
+            <th style="width:34px">#</th>
+            <th style="width:120px">Date</th>
+            <th style="width:90px">HSN</th>
+            <th style="width:140px">Vehicle No</th>
+            <th>Particulars</th>
+            <th class="num" style="width:120px">Amount (₹)</th>
+            <th style="width:36px"></th>
+          </tr>
+        </thead>
+        <tbody id="itemsBody"></tbody>
+      </table>
+      <div class="row-actions">
+        <button class="btn sm" id="addRowBtn">＋ Add row</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="ico">🧮</span> Tax & totals</h2>
+      <div class="grid g3">
+        <label class="field">Tax type
+          <select id="taxType">
+            <option value="intra">SGST + CGST (within state)</option>
+            <option value="inter">IGST (other state)</option>
+            <option value="none">No tax</option>
+          </select>
+        </label>
+        <label class="field" id="rate1Wrap">SGST %
+          <input id="rate1" type="number" step="0.01" value="9">
+        </label>
+        <label class="field" id="rate2Wrap">CGST %
+          <input id="rate2" type="number" step="0.01" value="9">
+        </label>
+      </div>
+      <div class="grid g3" style="margin-top:14px">
+        <label class="field">extra charge (കൂലി) (₹)
+          <input id="carrying" type="number" step="0.01" min="0" value="0">
+          <span class="hint">Extra/Transport charges</span>
+        </label>
+        <label class="field">Discount (₹)
+          <input id="discount" type="number" step="0.01" min="0" value="0">
+          <span class="hint">Enter a non-negative discount amount</span>
+        </label>
+        <label class="field">Round off (₹)
+          <input id="roundOff" type="number" step="0.01" min="0" value="0">
+          <span class="hint">Use a positive or zero value only</span>
+        </label>
+      </div>
+      <div class="row-actions" style="justify-content:flex-end;margin-top:10px">
+        <button class="btn sm ghost" id="autoRoundBtn">↺ Auto round to nearest ₹</button>
+      </div>
+
+      <div class="totals" id="totalsBox"></div>
+      <div class="words" id="wordsBox">Amount in words…</div>
+    </div>
+
+    <div class="card" style="display:flex;gap:12px;flex-wrap:wrap">
+      <button class="btn primary" id="saveBillBtn">💾 Save bill</button>
+      <button class="btn ok" id="printBillBtn">🖨️ Print / Save PDF</button>
+      <button class="btn ghost" id="newBillBtn">＋ New blank bill</button>
+      <span class="hint" id="editingNote" style="align-self:center"></span>
+    </div>
+  </section>
+
+  <!-- ============ SAVED BILLS ============ -->
+  <section id="view-saved" class="view">
+    <div class="card">
+      <h2><span class="ico">📂</span> Saved bills</h2>
+      <div class="row-actions" style="margin-bottom:12px">
+        <input id="searchBills" class="btn" style="flex:1;min-width:200px;background:#fff;border:1px solid var(--line);text-align:left;font-weight:400" placeholder="🔎 Search invoice or customer…">
+      </div>
+      <div class="table-wrap">
+        <table class="pro">
+          <thead><tr><th>Invoice</th><th>Date</th><th>Customer</th><th class="num">Total</th><th class="num">Actions</th></tr></thead>
+          <tbody id="billsBody"></tbody>
+        </table>
+      </div>
+      <div class="row-actions" style="justify-content:center;margin-top:14px">
+        <button class="btn ghost sm" id="loadMoreBillsBtn" style="display:none">Load more bills</button>
+      </div>
+      <div id="billsEmpty" class="empty">No bills saved yet. Create one in the “Create Bill” tab.</div>
+    </div>
+  </section>
+
+  <!-- ============ CUSTOMERS ============ -->
+  <section id="view-customers" class="view">
+    <div class="card">
+      <h2><span class="ico">👥</span> Customers</h2>
+      <div class="row-actions" style="margin-bottom:12px">
+        <input id="searchCustomers" class="btn" style="flex:1;min-width:200px;background:#fff;border:1px solid var(--line);text-align:left;font-weight:400" placeholder="🔎 Search customers…">
+        <button class="btn ok sm" id="openCreateCustomerBtn">＋ Create</button>
+      </div>
+      <div class="table-wrap">
+        <table class="pro">
+          <thead><tr><th>Customer</th><th>Address</th><th>GSTIN</th><th class="num">Actions</th></tr></thead>
+          <tbody id="custBody"></tbody>
+        </table>
+      </div>
+      <div class="row-actions" style="justify-content:center;margin-top:14px">
+        <button class="btn ghost sm" id="loadMoreCustomersBtn" style="display:none">Load more customers</button>
+      </div>
+      <div id="custEmpty" class="empty">No customers yet. Create one using the button above.</div>
+    </div>
+  </section>
+
+  <div id="createCustomerModal" style="display:none;position:fixed;inset:0;background:rgba(11,37,69,.45);z-index:400;align-items:center;justify-content:center;padding:20px">
+    <div style="background:#fff;width:100%;max-width:520px;border-radius:14px;overflow:hidden;box-shadow:var(--shadow-lg)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px;background:#f7fbff;border-bottom:1px solid var(--line)">
+        <h3 style="margin:0;font-size:16px">Create customer</h3>
+        <button class="btn ghost sm" id="closeCreateCustomerModal">Close</button>
+      </div>
+      <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
+        <label class="field">Name<input id="modalCustName" placeholder="Customer name"></label>
+        <label class="field">GSTIN<input id="modalCustGst" placeholder="GSTIN"></label>
+        <label class="field">Address<textarea id="modalCustAddr"></textarea></label>
+        <div style="display:flex;justify-content:flex-end;gap:10px">
+          <button class="btn ghost sm" id="cancelCreateCustomer">Cancel</button>
+          <button class="btn ok sm" id="modalAddCustBtn">＋ Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SETTINGS ============ -->
+  <section id="view-settings" class="view">
+    <div class="accordion">
+      <div class="accordion-item">
+        <button type="button" class="accordion-toggle active"><span class="ico">🏢</span> Your company</button>
+        <div class="accordion-panel active">
+          <div class="card-body">
+            <div class="grid g2">
+              <label class="field">Bill title<input id="setTitle" placeholder="TRANSPORT BILL"></label>
+              <label class="field">Company name<input id="setName" placeholder="EXPRESS LOGISTICS AND TRANSPORTS"></label>
+            </div>
+            <label class="field" style="margin-top:14px">Address<textarea id="setAddr" placeholder="NH-Bye Pass, Chalakudy-680307&#10;Thrissur Dist Kerala Ph 8848426692"></textarea></label>
+            <label class="field" style="margin-top:14px">GST No<input id="setGst" placeholder="32CEBPB8111C1ZG"></label>
+            <div style="margin-top:14px">
+              <label class="field">Logo / seal image
+                <input id="setLogoFile" type="file" accept="image/*">
+              </label>
+              <div class="row-actions" style="align-items:center">
+                <img id="setLogoPrev" class="logo-prev" style="display:none" alt="logo">
+                <button class="btn danger sm" id="setLogoClear" style="display:none">Remove logo</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item">
+        <button type="button" class="accordion-toggle"><span class="ico">🏦</span> Bank details (printed on bill)</button>
+        <div class="accordion-panel">
+          <div class="card-body">
+            <div class="grid g2">
+              <label class="field">Account name<input id="setBankName"></label>
+              <label class="field">Bank<input id="setBank"></label>
+              <label class="field">Branch<input id="setBranch"></label>
+              <label class="field">A/C No<input id="setAcc"></label>
+              <label class="field">IFSC<input id="setIfsc"></label>
+              <label class="field">Default financial year<input id="setFY" placeholder="2026-2027"></label>
+            </div>
+            <div class="row-actions"><button class="btn primary sm" id="saveSettingsBtn">💾 Save settings</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item">
+        <button type="button" class="accordion-toggle"><span class="ico">💾</span> Backup</button>
+        <div class="accordion-panel">
+          <div class="card-body">
+            <p class="hint" style="margin-top:0">Everything is stored in this browser. Export a backup file you can keep safe or move to another computer.</p>
+            <div class="row-actions">
+              <button class="btn ok sm" id="exportBtn">⬇️ Export backup</button>
+              <button class="btn sm" id="importBtn">⬆️ Import backup</button>
+              <input id="importFile" type="file" accept="application/json" style="display:none">
+            </div>
+
+            <div style="margin-top:12px;border-top:1px dashed var(--line);padding-top:12px">
+              <h3 style="margin:0 0 8px 0;font-size:13px;color:var(--brand)">Cloud sync (Supabase)</h3>
+              <div class="grid g2">
+                <label class="field">Supabase URL<input id="supabaseUrl" value="https://gamnwecmnqadyhnbrbli.supabase.co" placeholder="https://xyzcompany.supabase.co"></label>
+                <label class="field">Anon key<input id="supabaseKey" placeholder="anon key"></label>
+              </div>
+              <div class="row-actions" style="margin-top:8px">
+                <button class="btn primary sm" id="saveSupabaseBtn">Connect & save</button>
+                <button class="btn ok sm" id="uploadSupabaseBtn">⬆️ Upload backup</button>
+                <button class="btn ok sm" id="syncDataBtn">🔁 Sync customers & bills</button>
+                <button class="btn sm" id="listSupabaseBtn">📄 List backups</button>
+                <button class="btn ghost sm" id="loadSupabaseLatestBtn">⬇️ Load latest</button>
+                <span id="supabaseStatus" style="align-self:center;margin-left:6px;color:var(--muted)"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Print target -->
+<div id="print-area"></div>
+<div class="toast" id="toast"></div>
+
+<!-- Backup list modal -->
+<div id="backupListModal" style="display:none;position:fixed;inset:0;background:rgba(11,37,69,.45);z-index:300;align-items:center;justify-content:center">
+  <div style="background:#fff;max-width:820px;width:94%;border-radius:12px;padding:18px;box-shadow:var(--shadow-lg);margin:36px auto;max-height:80vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 style="margin:0">Supabase backups</h3>
+      <button class="btn ghost sm" id="closeBackupList">Close</button>
+    </div>
+    <div id="backupListBody" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</div>
+<!-- load supabase client as an ES module and expose factory to window -->
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+  window.createSupabaseClient = createClient;
+</script>
+
+<script>
+"use strict";
+/* ============================================================
+   Simple billing app — single file, no dependencies.
+   Data persisted in localStorage. Print via window.print().
+   ============================================================ */
+const LS = {
+  settings:"elt_settings", customers:"elt_customers", bills:"elt_bills"
+};
+const $ = id => document.getElementById(id);
+const money = n => (Number(n)||0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+const todayISO = () => new Date().toISOString().slice(0,10);
+const load = (k,def) => { try{return JSON.parse(localStorage.getItem(k)) ?? def;}catch(e){return def;} };
+const save = (k,v) => localStorage.setItem(k,JSON.stringify(v));
+const SUPABASE_PAGE_SIZE = 10;
+let supabaseBillsPage = 0;
+let supabaseCustomersPage = 0;
+let supabaseBillsHasMore = false;
+let supabaseCustomersHasMore = false;
+
+function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),2200);}
+
+/* ---------- Defaults seeded from the sample bill ---------- */
+const DEFAULT_SETTINGS = {
+  title:"TRANSPORT BILL",
+  name:"EXPRESS LOGISTICS AND TRANSPORTS",
+  addr:"NH-Bye Pass, Chalakudy-680307\nThrissur Dist Kerala  Ph 8848426692",
+  gst:"32CEBPB8111C1ZG",
+  bankName:"EXPRESS LOGISTICS & TRANSPORTS",
+  bank:"CANARA BANK", branch:"IRINJALAKUDA",
+  acc:"1200 2933 5780", ifsc:"CNRB0000807",
+  fy:"2026-2027", lastInv:3, logo:""
+};
+
+let settings = Object.assign({}, DEFAULT_SETTINGS, load(LS.settings,{}));
+let customers = load(LS.customers,[]);
+let bills = load(LS.bills,[]);
+let editingId = null; // id of bill being edited, else null
+
+/* ---------- Number to words (Indian system) ---------- */
+function numToWords(num){
+  num = Math.round(Number(num)||0);
+  if(num===0) return "Zero only";
+  const a=["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+  const b=["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+  const two = n => n<20 ? a[n] : b[Math.floor(n/10)] + (n%10? " "+a[n%10]:"");
+  const three = n => (n>=100? a[Math.floor(n/100)]+" Hundred"+(n%100?" ":""):"") + (n%100? two(n%100):"");
+  let res="", crore=Math.floor(num/10000000); num%=10000000;
+  let lakh=Math.floor(num/100000); num%=100000;
+  let thou=Math.floor(num/1000); num%=1000;
+  let hund=num;
+  if(crore) res+=three(crore)+" Crore ";
+  if(lakh) res+=two(lakh)+" Lakh ";
+  if(thou) res+=two(thou)+" Thousand ";
+  if(hund) res+=three(hund);
+  return res.trim().replace(/\s+/g," ") + " only";
+}
+
+/* ============================================================
+   TAB NAVIGATION
+   ============================================================ */
+document.querySelectorAll("nav.tabs button").forEach(btn=>{
+  btn.addEventListener("click",async ()=>{
+    document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+    btn.classList.add("active");
+    $("view-"+btn.dataset.tab).classList.add("active");
+    if(btn.dataset.tab==="saved"){
+      if(getSupabaseClient()){
+        await loadBillsFromSupabase(true);
+      } else {
+        renderBills();
+      }
+    }
+    if(btn.dataset.tab==="customers"){
+      if(getSupabaseClient()){
+        await loadCustomersFromSupabase(true);
+      } else {
+        renderCustomers();
+      }
+    }
+  });
+});
+
+/* ============================================================
+   ITEMS TABLE
+   ============================================================ */
+function addRow(data={}){
+  const tr=document.createElement("tr");
+  tr.innerHTML=`
+    <td class="rownum"></td>
+    <td><input type="date" class="i-date" value="${data.date||todayISO()}"></td>
+    <td><input class="i-hsn" value="${data.hsn||""}" placeholder="9965"></td>
+    <td><input class="i-veh" value="${(data.veh||"").toUpperCase()}" placeholder="TS 09 UB 8049"></td>
+    <td><textarea class="i-part" rows="1" placeholder="Transportation of goods…">${data.part||""}</textarea></td>
+    <td class="num"><input type="number" step="0.01" class="i-amt num" style="text-align:right" value="${data.amt??""}" placeholder="0.00"></td>
+    <td><button class="del-row" title="Remove">×</button></td>`;
+  tr.querySelector(".del-row").addEventListener("click",()=>{tr.remove();renumber();recalc();});
+  tr.querySelector(".i-amt").addEventListener("input",e=>{
+    if(Number(e.target.value) < 0) e.target.value = '0';
+    recalc();
+  });
+  const vehField = tr.querySelector(".i-veh");
+  const upperVeh = e=>{e.target.value = e.target.value.toUpperCase();};
+  vehField.addEventListener("focus",upperVeh);
+  vehField.addEventListener("input",upperVeh);
+  $("itemsBody").appendChild(tr);
+  renumber();
+}
+function renumber(){[...$("itemsBody").children].forEach((tr,i)=>tr.querySelector(".rownum").textContent=i+1);}
+function readItems(){
+  return [...$("itemsBody").children].map(tr=>({
+    date:tr.querySelector(".i-date").value,
+    hsn:tr.querySelector(".i-hsn").value.trim(),
+    veh:tr.querySelector(".i-veh").value.trim().toUpperCase(),
+    part:tr.querySelector(".i-part").value.trim(),
+    amt:Math.max(0,Number(tr.querySelector(".i-amt").value)||0)
+  }));
+}
+
+function validateBillItems(){
+  const invalid = readItems().some(i=>i.amt < 0);
+  if(invalid){ toast('Item amount cannot be negative'); return false; }
+  return true;
+}
+
+/* ============================================================
+   TAX / TOTALS
+   ============================================================ */
+function taxLabels(){
+  const t=$("taxType").value;
+  if(t==="intra") return ["SGST","CGST"];
+  if(t==="inter") return ["IGST",null];
+  return [null,null];
+}
+function applyTaxUI(){
+  const [l1,l2]=taxLabels();
+  $("rate1Wrap").style.display = l1?"flex":"none";
+  $("rate2Wrap").style.display = l2?"flex":"none";
+  if(l1) $("rate1Wrap").childNodes[0].nodeValue = l1+" %";
+  if(l2) $("rate2Wrap").childNodes[0].nodeValue = l2+" %";
+}
+function computeTotals(){
+  const items=readItems();
+  const sub=items.reduce((s,i)=>s+i.amt,0);
+  const [l1,l2]=taxLabels();
+  const r1=l1?Math.max(0,Number($("rate1").value)||0):0;
+  const r2=l2?Math.max(0,Number($("rate2").value)||0):0;
+  const t1=sub*r1/100, t2=sub*r2/100;
+  const carrying=Math.max(0,Number($("carrying").value)||0);
+  const discount=Math.max(0,Number($("discount").value)||0);
+  const round=Math.max(0,Number($("roundOff").value)||0);
+  const grand=sub+t1+t2+carrying-discount+round;
+  return {sub,l1,l2,r1,r2,t1,t2,carrying,discount,round,grand};
+}
+function recalc(){
+  const t=computeTotals();
+  let html=`<div class="line"><span>Subtotal</span><b>₹ ${money(t.sub)}</b></div>`;
+  if(t.l1) html+=`<div class="line"><span>${t.l1} ${t.r1}%</span><b>₹ ${money(t.t1)}</b></div>`;
+  if(t.l2) html+=`<div class="line"><span>${t.l2} ${t.r2}%</span><b>₹ ${money(t.t2)}</b></div>`;
+  if(t.carrying) html+=`<div class="line"><span>Extra charge (കൂലി)</span><b>₹ ${money(t.carrying)}</b></div>`;
+  if(t.discount) html+=`<div class="line"><span>Discount</span><b>₹ ${money(t.discount)}</b></div>`;
+  html+=`<div class="line"><span>Round off</span><b>₹ ${money(t.round)}</b></div>`;
+  html+=`<div class="line grand"><span>TOTAL</span><span>₹ ${money(t.grand)}</span></div>`;
+  $("totalsBox").innerHTML=html;
+  $("wordsBox").textContent = "₹ in words:  "+numToWords(t.grand);
+}
+["taxType","rate1","rate2","roundOff","carrying","discount"].forEach(id=>$(id).addEventListener("input",e=>{if(id==="taxType")applyTaxUI(); if(Number($(id).value)<0) $(id).value='0'; recalc();}));
+$("autoRoundBtn").addEventListener("click",()=>{
+  const t=computeTotals();
+  const before=t.sub+t.t1+t.t2;
+  $("roundOff").value=(Math.round(before)-before).toFixed(2);
+  recalc();
+});
+$("addRowBtn").addEventListener("click",()=>{addRow();});
+
+/* ============================================================
+   CUSTOMERS
+   ============================================================ */
+function refreshCustPicker(){
+  const sel=$("custPick"); const cur=sel.value;
+  sel.innerHTML='<option value="">— Choose a saved customer —</option>';
+  customers.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach((c)=>{
+    const i=customers.indexOf(c);
+    const o=document.createElement("option"); o.value=i; o.textContent=c.name+(c.gst?`  ·  ${c.gst}`:"");
+    sel.appendChild(o);
+  });
+  sel.value=cur;
+}
+$("custPick").addEventListener("change",e=>{
+  const c=customers[e.target.value];
+  if(c){
+    $("custName").value=c.name;$("custAddr").value=c.addr;$("custGst").value=c.gst;
+    $("selectedFlag").classList.add("show");
+    toast("Loaded “"+c.name+"”");
+  }else{
+    $("selectedFlag").classList.remove("show");
+  }
+});
+// Typing in any customer field means it's no longer a clean pick — clear the flag/selection
+["custName","custAddr","custGst"].forEach(id=>$(id).addEventListener("input",()=>{
+  $("selectedFlag").classList.remove("show");
+  $("custPick").value="";
+}));
+let editingCustomerModalId = null;
+function upsertCustomer(name,addr,gst,id=null){
+  name=name.trim(); if(!name){toast("Enter a customer name first");return false;}
+  const searchId = id || null;
+  const i = searchId ? customers.findIndex(c=>(c._id||c.id)===searchId) : customers.findIndex(c=>c.name.toLowerCase()===name.toLowerCase());
+  const rec={name,addr:addr.trim(),gst:gst.trim()};
+  if(i>=0){
+    rec._id = customers[i]._id || customers[i].id || null;
+    customers[i]=Object.assign({},customers[i],rec);
+  } else {
+    rec._id = uuidv4();
+    customers.push(rec);
+  }
+  save(LS.customers,customers); refreshCustPicker();
+  return true;
+}
+$("saveCustBtn").addEventListener("click",()=>{
+  if(upsertCustomer($("custName").value,$("custAddr").value,$("custGst").value)){
+    toast("Customer saved");
+    try{ if(getSupabaseClient()) setTimeout(syncCustomersAndBillsToSupabase,30); }catch(e){}
+  }
+});
+
+function renderCustomers(){
+  const q=$("searchCustomers").value.toLowerCase();
+  const body=$("custBody"); body.innerHTML="";
+  const filtered = customers.filter(c=>!q || (c.name+" "+c.addr+" "+c.gst).toLowerCase().includes(q));
+  $("custEmpty").style.display=filtered.length?"none":"block";
+  const dash='<span style="color:#b6c0cc">—</span>';
+  filtered.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach((c)=>{
+    const i=customers.indexOf(c);
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td><div class="c-name">${esc(c.name)}</div></td>
+      <td class="addr">${c.addr?esc(c.addr):dash}</td>
+      <td>${c.gst?`<span class="gst-tag">${esc(c.gst)}</span>`:dash}</td>
+      <td><div class="tbl-actions">
+        <button class="icon-btn" data-a="use" title="Use in a new bill">🧾 Use</button>
+        <button class="icon-btn" data-a="edit" title="Edit details">✏️ Edit</button>
+        <button class="icon-btn del" data-a="del" title="Delete">🗑️</button>
+      </div></td>`;
+    tr.querySelector('[data-a="use"]').addEventListener("click",()=>{
+      $("custName").value=c.name;$("custAddr").value=c.addr;$("custGst").value=c.gst;
+      $("custPick").value=i;$("selectedFlag").classList.add("show");
+      document.querySelector('nav.tabs button[data-tab="create"]').click();
+      toast('Using “'+c.name+'” in this bill');
+    });
+    tr.querySelector('[data-a="edit"]').addEventListener("click",()=>{
+      editingCustomerModalId = c._id || c.id;
+      $("modalCustName").value=c.name;$("modalCustAddr").value=c.addr;$("modalCustGst").value=c.gst;
+      $("createCustomerModal").querySelector('h3').textContent='Edit customer';
+      $("modalAddCustBtn").textContent='Save';
+      $("createCustomerModal").style.display='flex';
+      toast("Edit customer in the modal then click Save");
+    });
+    tr.querySelector('[data-a="del"]').addEventListener("click",()=>{
+      if(confirm("Delete customer “"+c.name+"”?")){customers.splice(i,1);save(LS.customers,customers);renderCustomers();refreshCustPicker();}
+    });
+    body.appendChild(tr);
+  });
+}
+const esc = s => String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+
+/* ============================================================
+   BILL: gather / load / save / print
+   ============================================================ */
+function gatherBill(){
+  const t=computeTotals();
+  return {
+    id: editingId || ("B"+Date.now()),
+    invNo:$("invNo").value.trim(), fy:$("invFY").value.trim(), date:$("invDate").value,
+    cust:{name:$("custName").value.trim(),addr:$("custAddr").value.trim(),gst:$("custGst").value.trim()},
+    items:readItems(),
+    taxType:$("taxType").value, rate1:Number($("rate1").value)||0, rate2:Number($("rate2").value)||0,
+    carrying:Number($("carrying").value)||0,
+    discount:Number($("discount").value)||0,
+    roundOff:Number($("roundOff").value)||0,
+    totals:t,
+    savedAt: todayISO()
+  };
+}
+function loadBill(b){
+  editingId=b.id;
+  $("invNo").value=b.invNo; $("invFY").value=b.fy; $("invDate").value=b.date;
+  $("custName").value=b.cust.name; $("custAddr").value=b.cust.addr; $("custGst").value=b.cust.gst;
+  $("taxType").value=b.taxType; $("rate1").value=b.rate1; $("rate2").value=b.rate2; $("carrying").value=b.carrying||0; $("roundOff").value=b.roundOff;
+  $("itemsBody").innerHTML=""; (b.items.length?b.items:[{}]).forEach(addRow);
+  applyTaxUI(); recalc();
+  $("editingNote").textContent="Editing saved bill "+(b.invNo||b.id);
+  document.querySelector('nav.tabs button[data-tab="create"]').click();
+}
+function newBill(){
+  editingId=null;
+  settings.lastInv=Number(settings.lastInv)||0;
+  $("invNo").value=String((settings.lastInv+1)).padStart(3,"0");
+  $("invFY").value=settings.fy||"";
+  $("invDate").value=todayISO();
+  $("custName").value=$("custAddr").value=$("custGst").value="";
+  $("custPick").value="";
+  $("taxType").value="intra"; $("rate1").value=9; $("rate2").value=9; $("carrying").value=0; $("roundOff").value=0;
+  $("itemsBody").innerHTML=""; addRow();
+  applyTaxUI(); recalc();
+  $("editingNote").textContent="";
+}
+$("newBillBtn").addEventListener("click",()=>{if(confirm("Start a new blank bill? Unsaved changes will be lost."))newBill();});
+
+$("saveBillBtn").addEventListener("click",()=>{
+  if(!validateBillItems()) return;
+  const b=gatherBill();
+  if(!b.invNo){toast("Enter an invoice number");return;}
+  const idx=bills.findIndex(x=>x.id===b.id);
+  if(idx>=0) bills[idx]=b; else bills.unshift(b);
+  // bump auto-increment if this is a new, numeric, higher invoice
+  const n=parseInt(b.invNo,10);
+  if(!isNaN(n) && n>(Number(settings.lastInv)||0)){settings.lastInv=n;save(LS.settings,settings);}
+  editingId=b.id;
+  save(LS.bills,bills);
+  $("editingNote").textContent="Saved ✓ (bill "+b.invNo+")";
+  toast("Bill saved");
+  try{ if(getSupabaseClient()) setTimeout(syncCustomersAndBillsToSupabase,30); }catch(e){}
+});
+
+$("printBillBtn").addEventListener("click",()=>{
+  const b=gatherBill();
+  $("print-area").innerHTML=renderBillHTML(b);
+  window.print();
+});
+
+function renderBillHTML(b){
+  const s=settings, t=b.totals;
+  const filled = b.items.filter(i=>i.amt||i.part||i.veh||i.hsn);
+  let itemRows = filled.map((i,idx)=>`
+    <tr>
+      <td class="r-no">${idx+1}</td>
+      <td>${i.date?fmtDate(i.date):""}</td>
+      <td>${esc(i.hsn)}</td>
+      <td>${esc(i.veh)}</td>
+      <td>${esc(i.part).replace(/\n/g,"<br>")}</td>
+      <td class="r-amt">${i.amt?money(i.amt):""}</td>
+    </tr>`).join("");
+  const taxRows = (()=>{
+    let r="";
+    if(t.l1) r+=`<tr class="sum"><td colspan="5" style="text-align:right">${t.l1} ${t.r1}%</td><td class="r-amt">${money(t.t1)}</td></tr>`;
+    if(t.l2) r+=`<tr class="sum"><td colspan="5" style="text-align:right">${t.l2} ${t.r2}%</td><td class="r-amt">${money(t.t2)}</td></tr>`;
+    if(t.carrying) r+=`<tr class="sum"><td colspan="5" style="text-align:right">extra charge (കൂലി)</td><td class="r-amt">${money(t.carrying)}</td></tr>`;
+    if(t.round) r+=`<tr class="sum"><td colspan="5" style="text-align:right">Round off</td><td class="r-amt">${money(t.round)}</td></tr>`;
+    return r;
+  })();
+  const logo = s.logo?`<img src="${s.logo}" class="b-logo">`:"";
+  return `
+  <div class="bill">
+    <div class="b-title">${esc(s.title||"BILL")}</div>
+    <div class="b-head">
+      <div class="b-company">
+        ${logo}
+        <div class="cname">${esc(s.name)}</div>
+        <div class="caddr">${esc(s.addr).replace(/\n/g,"<br>")}<br>GST NO : ${esc(s.gst)}</div>
+      </div>
+      <div class="b-meta">
+        <div><b>Invoice No :</b> ${esc(b.invNo)}</div>
+        <div>${esc(b.fy)}</div>
+        <div><b>Date :</b> ${b.date?fmtDate(b.date):""}</div>
+      </div>
+    </div>
+    <div class="b-to">
+      <b>To,</b> ${esc(b.cust.name)}<br>
+      <span style="margin-left:40px">${esc(b.cust.addr).replace(/\n/g,"<br>")}</span><br>
+      <b style="min-width:0">GSTIN :</b> ${esc(b.cust.gst)}
+    </div>
+    <table class="b-items">
+      <thead><tr>
+        <th style="width:34px">Sl.No</th><th style="width:78px">Date</th><th style="width:60px">HSN</th>
+        <th style="width:96px">Veh No</th><th>Particulars</th><th style="width:90px;text-align:right">Amount</th>
+      </tr></thead>
+      <tbody>
+        ${itemRows}
+        ${taxRows}
+        <tr class="grand"><td colspan="5" style="text-align:right">TOTAL</td>
+            <td class="r-amt">₹ ${money(t.grand)}</td></tr>
+      </tbody>
+    </table>
+    <div class="b-words">Rupees : ${numToWords(t.grand)}</div>
+    <div class="b-foot">
+      <div class="b-bank">
+        <b>Bank details</b><br>
+        NAME&nbsp;&nbsp;&nbsp;: ${esc(s.bankName)}<br>
+        BANK&nbsp;&nbsp;&nbsp;: ${esc(s.bank)}<br>
+        BRANCH : ${esc(s.branch)}<br>
+        A/C No&nbsp;: ${esc(s.acc)}<br>
+        IFSC&nbsp;&nbsp;&nbsp;&nbsp;: ${esc(s.ifsc)}
+      </div>
+      <div class="b-sign">
+        <div>For ${esc(s.name)}</div>
+        ${s.logo?`<img src="${s.logo}" class="seal">`:`<div style="height:60px"></div>`}
+        <div>Authorised signatory</div>
+      </div>
+    </div>
+  </div>`;
+}
+function fmtDate(iso){const [y,m,d]=iso.split("-");return `${d}.${m}.${y}`;}
+
+/* Remove the browser's print header text (the document title shown top-left).
+   The URL shown top-right is a browser setting — turn off "Headers and footers"
+   in the print dialog to hide it. */
+let _savedTitle=document.title;
+window.addEventListener("beforeprint",()=>{_savedTitle=document.title;document.title=" ";});
+window.addEventListener("afterprint",()=>{document.title=_savedTitle;});
+
+/* ============================================================
+   SAVED BILLS LIST
+   ============================================================ */
+function renderBills(){
+  const q=$("searchBills").value.toLowerCase();
+  const body=$("billsBody"); body.innerHTML="";
+  const list=bills.filter(b=>!q || (b.invNo+" "+b.cust.name).toLowerCase().includes(q));
+  $("billsEmpty").style.display=list.length?"none":"block";
+  list.forEach(b=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td><span class="inv-tag">${esc(b.invNo)}</span></td>
+      <td>${b.date?fmtDate(b.date):"—"}</td>
+      <td class="c-name">${esc(b.cust.name)||'<span style="color:#b6c0cc">—</span>'}</td>
+      <td class="num"><span class="amt-tag">₹ ${money(b.totals.grand)}</span></td>
+      <td><div class="tbl-actions">
+        <button class="icon-btn" data-a="open">📂 Open</button>
+        <button class="icon-btn" data-a="print">🖨️ Print</button>
+        <button class="icon-btn del" data-a="del">🗑️</button>
+      </div></td>`;
+    tr.querySelector('[data-a="open"]').addEventListener("click",()=>loadBill(b));
+    tr.querySelector('[data-a="print"]').addEventListener("click",()=>{
+      $("print-area").innerHTML=renderBillHTML(b);window.print();
+    });
+    tr.querySelector('[data-a="del"]').addEventListener("click",()=>{
+      if(confirm("Delete bill "+b.invNo+"?")){bills=bills.filter(x=>x.id!==b.id);save(LS.bills,bills);renderBills();}
+    });
+    body.appendChild(tr);
+  });
+}
+$("searchBills").addEventListener("input",renderBills);
+$("searchCustomers").addEventListener("input",renderCustomers);
+$("openCreateCustomerBtn").addEventListener("click",()=>{
+  editingCustomerModalId = null;
+  $("modalCustName").value=$("modalCustAddr").value=$("modalCustGst").value="";
+  $("createCustomerModal").querySelector('h3').textContent='Create customer';
+  $("modalAddCustBtn").textContent='＋ Create';
+  $("createCustomerModal").style.display='flex';
+});
+$("closeCreateCustomerModal").addEventListener("click",()=>{
+  editingCustomerModalId = null;
+  $("createCustomerModal").style.display='none';
+});
+$("cancelCreateCustomer").addEventListener("click",()=>{
+  editingCustomerModalId = null;
+  $("createCustomerModal").style.display='none';
+});
+$("modalAddCustBtn").addEventListener("click",()=>{
+  const name=$("modalCustName").value.trim();
+  const addr=$("modalCustAddr").value.trim();
+  const gst=$("modalCustGst").value.trim();
+  const wasEdit = Boolean(editingCustomerModalId);
+  if(upsertCustomer(name,addr,gst,editingCustomerModalId)){
+    editingCustomerModalId = null;
+    $("modalCustName").value=$("modalCustAddr").value=$("modalCustGst").value="";
+    $("createCustomerModal").style.display='none';
+    $("createCustomerModal").querySelector('h3').textContent='Create customer';
+    $("modalAddCustBtn").textContent='＋ Create';
+    renderCustomers(); toast(wasEdit ? 'Customer saved' : 'Customer created');
+    try{ if(getSupabaseClient()) setTimeout(syncCustomersAndBillsToSupabase,30); }catch(e){}
+  }
+});
+
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+function fillSettings(){
+  $("setTitle").value=settings.title; $("setName").value=settings.name; $("setAddr").value=settings.addr;
+  $("setGst").value=settings.gst; $("setBankName").value=settings.bankName; $("setBank").value=settings.bank;
+  $("setBranch").value=settings.branch; $("setAcc").value=settings.acc; $("setIfsc").value=settings.ifsc;
+  $("setFY").value=settings.fy;
+  $("brandName").textContent=settings.name||"Billing";
+  const bl=$("brandLogo");
+  if(settings.logo){bl.src=settings.logo;bl.style.display="block";}
+  else{bl.style.display="none";}
+  if(settings.logo){$("setLogoPrev").src=settings.logo;$("setLogoPrev").style.display="inline-block";$("setLogoClear").style.display="inline-block";}
+  else{$("setLogoPrev").style.display="none";$("setLogoClear").style.display="none";}
+}
+$("saveSettingsBtn").addEventListener("click",()=>{
+  Object.assign(settings,{
+    title:$("setTitle").value,name:$("setName").value,addr:$("setAddr").value,gst:$("setGst").value,
+    bankName:$("setBankName").value,bank:$("setBank").value,branch:$("setBranch").value,
+    acc:$("setAcc").value,ifsc:$("setIfsc").value,fy:$("setFY").value
+  });
+  save(LS.settings,settings); fillSettings(); toast("Settings saved");
+});
+$("setLogoFile").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{settings.logo=r.result;save(LS.settings,settings);fillSettings();toast("Logo added");};
+  r.readAsDataURL(f);
+});
+$("setLogoClear").addEventListener("click",()=>{settings.logo="";save(LS.settings,settings);fillSettings();});
+
+/* ---------- Backup export / import ---------- */
+$("exportBtn").addEventListener("click",()=>{
+  const data=JSON.stringify({settings,customers,bills,_v:1},null,2);
+  const blob=new Blob([data],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="billing-backup-"+todayISO()+".json";
+  a.click(); URL.revokeObjectURL(a.href); toast("Backup downloaded");
+});
+$("importBtn").addEventListener("click",()=>$("importFile").click());
+$("importFile").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      if(!confirm("Importing will REPLACE current data with the backup. Continue?"))return;
+      settings=Object.assign({},DEFAULT_SETTINGS,d.settings||{});
+      customers=d.customers||[]; bills=d.bills||[];
+      save(LS.settings,settings);save(LS.customers,customers);save(LS.bills,bills);
+      fillSettings();refreshCustPicker();newBill();toast("Backup imported");
+    }catch(err){alert("Could not read backup file: "+err.message);}
+  };
+  r.readAsText(f);
+});
+
+/* ---------------- Supabase sync helpers ---------------- */
+const LS_SUP="elt_supabase";
+function saveSupabaseCredsObj(o){localStorage.setItem(LS_SUP,JSON.stringify(o));}
+function loadSupabaseCredsObj(){try{return JSON.parse(localStorage.getItem(LS_SUP))||{};}catch(e){return {};}}
+function updateSupabaseUI(){const s=loadSupabaseCredsObj(); if(s.url) $("supabaseUrl").value=s.url; if(s.key) $("supabaseKey").value=s.key; const st=$("supabaseStatus"); st.textContent = s.url?"Connected (saved)":"Not connected";}
+function getSupabaseClient(){
+  const s = loadSupabaseCredsObj();
+  const urlField = $("supabaseUrl");
+  const keyField = $("supabaseKey");
+  const url = urlField ? urlField.value.trim() : s.url;
+  const key = keyField ? keyField.value.trim() : s.key;
+  if(url && key && (url !== s.url || key !== s.key)){
+    saveSupabaseCredsObj({url,key});
+    updateSupabaseUI();
+    s.url = url; s.key = key;
+  }
+  if(!s.url||!s.key) return null;
+  if(!window._supabaseClient || window._supabaseClient._supabaseUrl!==s.url || window._supabaseClient._supabaseKey!==s.key){
+    if(!window.createSupabaseClient){toast('Supabase client loader not available'); return null;}
+    window._supabaseClient = window.createSupabaseClient(s.url,s.key);
+    window._supabaseClient._supabaseUrl=s.url;
+    window._supabaseClient._supabaseKey=s.key;
+  }
+  return window._supabaseClient;
+}
+
+async function uploadBackupToSupabase(){
+  const sup=getSupabaseClient(); if(!sup){toast('Save Supabase URL & key first');return;}
+  const payload={settings,customers,bills,_v:1};
+  try{
+    const name='billing-backup-'+todayISO();
+    const res=await sup.from('backups').insert([{name,data:payload}]);
+    if(res.error){toast('Upload failed: '+(res.error.message||res.error)); console.error(res.error);
+      console.log('If table "backups" does not exist, run this SQL in Supabase SQL editor:\nCREATE TABLE public.backups (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text, data jsonb);');
+    }else{toast('Backup uploaded to Supabase');}
+  }catch(err){toast('Upload error');console.error(err);}
+}
+
+async function listBackupsFromSupabase(){
+  const sup=getSupabaseClient(); if(!sup){toast('Save Supabase URL & key first');return;}
+  try{
+    const res=await sup.from('backups').select('id,name,created_at').order('created_at',{ascending:false}).limit(200);
+    if(res.error){toast('List failed: '+res.error.message);console.error(res.error);return;}
+    const rows=res.data||[];
+    if(!rows.length){toast('No backups found');return;}
+    // render modal with list
+    const modal=$("backupListModal"); const list=$("backupListBody"); list.innerHTML="";
+    rows.forEach(r=>{
+      const tr=document.createElement('div'); tr.className='backup-row';
+      tr.innerHTML=`<div style="flex:1"><b>${esc(r.name)||'untitled'}</b><div style="color:var(--muted);font-size:12px">${new Date(r.created_at).toLocaleString()}</div></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn sm" data-id="${r.id}" data-action="load">Load</button>
+          <button class="btn ghost sm" data-id="${r.id}" data-action="del">Delete</button>
+        </div>`;
+      list.appendChild(tr);
+    });
+    modal.style.display='block';
+    // wire buttons
+    list.querySelectorAll('button').forEach(btn=>{
+      btn.addEventListener('click',async e=>{
+        const id=btn.dataset.id, act=btn.dataset.action;
+        if(act==='load'){
+          if(!confirm('Loading will REPLACE local data. Continue?'))return;
+          const rec=await sup.from('backups').select('data').eq('id',id).single();
+          if(rec.error){toast('Load failed');console.error(rec.error);return;}
+          const d=rec.data.data;
+          settings=Object.assign({},DEFAULT_SETTINGS,d.settings||{});
+          customers=d.customers||[]; bills=d.bills||[];
+          save(LS.settings,settings);save(LS.customers,customers);save(LS.bills,bills);
+          fillSettings();refreshCustPicker();newBill();toast('Backup loaded'); modal.style.display='none';
+        }else if(act==='del'){
+          if(!confirm('Delete this backup?'))return;
+          const dres=await sup.from('backups').delete().eq('id',id);
+          if(dres.error){toast('Delete failed');console.error(dres.error);return;} 
+          toast('Backup deleted');
+          // refresh list
+          listBackupsFromSupabase();
+        }
+      });
+    });
+  }catch(err){toast('List error');console.error(err);}  
+}
+
+async function loadLatestBackupFromSupabase(){
+  const sup=getSupabaseClient(); if(!sup){toast('Save Supabase URL & key first');return;}
+  try{
+    const list=await sup.from('backups').select('id,created_at').order('created_at',{ascending:false}).limit(1);
+    if(list.error||!list.data||!list.data.length){toast('No backups found');return;}
+    const id=list.data[0].id;
+    const rec=await sup.from('backups').select('data').eq('id',id).single();
+    if(rec.error){toast('Load failed: '+rec.error.message);console.error(rec.error);return;}
+    const d=rec.data.data;
+    if(!confirm('Loading will REPLACE local data. Continue?')) return;
+    settings=Object.assign({},DEFAULT_SETTINGS,d.settings||{});
+    customers=d.customers||[]; bills=d.bills||[];
+    save(LS.settings,settings);save(LS.customers,customers);save(LS.bills,bills);
+    fillSettings();refreshCustPicker();newBill();toast('Backup loaded from Supabase');
+  }catch(err){toast('Load error');console.error(err);}  
+}
+
+async function loadBillsFromSupabase(reset=false){
+  const sup=getSupabaseClient(); if(!sup){toast('Save Supabase URL & key first');return;}
+  try{
+    if(reset){
+      supabaseBillsPage = 0;
+      supabaseBillsHasMore = false;
+    }
+    const start = supabaseBillsPage * SUPABASE_PAGE_SIZE;
+    const end = start + SUPABASE_PAGE_SIZE - 1;
+    const res = await sup.from('bills').select('id,data').order('created_at',{ascending:false}).range(start,end);
+    if(res.error){toast('Load bills failed: '+res.error.message);console.error(res.error);return;}
+    const rows = res.data||[];
+    const existing = new Map(bills.map(b=>[b.id,b]));
+    rows.forEach(r=>{
+      const item = r.data;
+      existing.set(item.id, item);
+    });
+    bills = Array.from(existing.values());
+    save(LS.bills,bills);
+    supabaseBillsHasMore = rows.length === SUPABASE_PAGE_SIZE;
+    supabaseBillsPage += 1;
+    updateLoadMoreButtons();
+    toast('Loaded '+rows.length+' bills from Supabase');
+    renderBills();
+  }catch(err){toast('Load bills error');console.error(err);}  
+}
+
+async function loadCustomersFromSupabase(reset=false){
+  const sup=getSupabaseClient(); if(!sup){toast('Save Supabase URL & key first');return;}
+  try{
+    if(reset){
+      supabaseCustomersPage = 0;
+      supabaseCustomersHasMore = false;
+    }
+    const start = supabaseCustomersPage * SUPABASE_PAGE_SIZE;
+    const end = start + SUPABASE_PAGE_SIZE - 1;
+    const res = await sup.from('customers').select('id,name,addr,gst').order('created_at',{ascending:false}).range(start,end);
+    if(res.error){toast('Load customers failed: '+res.error.message);console.error(res.error);return;}
+    const rows = res.data||[];
+    const existing = new Map(customers.map(c=>[(c._id||c.id),c]));
+    rows.forEach(r=>{
+      const item = {name:r.name,addr:r.addr,gst:r.gst,_id:r.id};
+      existing.set(r.id, item);
+    });
+    customers = Array.from(existing.values());
+    save(LS.customers,customers);
+    supabaseCustomersHasMore = rows.length === SUPABASE_PAGE_SIZE;
+    supabaseCustomersPage += 1;
+    updateLoadMoreButtons();
+    toast('Loaded '+rows.length+' customers from Supabase');
+    renderCustomers();
+  }catch(err){toast('Load customers error');console.error(err);}  
+}
+
+function updateLoadMoreButtons(){
+  const billsBtn = $("loadMoreBillsBtn");
+  const custBtn = $("loadMoreCustomersBtn");
+  if(billsBtn) billsBtn.style.display = supabaseBillsHasMore ? 'inline-flex' : 'none';
+  if(custBtn) custBtn.style.display = supabaseCustomersHasMore ? 'inline-flex' : 'none';
+}
+
+// Wire UI buttons
+$("saveSupabaseBtn").addEventListener('click',()=>{
+  const url=$("supabaseUrl").value.trim(), key=$("supabaseKey").value.trim();
+  if(!url||!key){toast('Enter URL and anon key');return;} saveSupabaseCredsObj({url,key}); updateSupabaseUI(); toast('Supabase credentials saved');
+});
+$("uploadSupabaseBtn").addEventListener('click',uploadBackupToSupabase);
+$("loadMoreBillsBtn").addEventListener('click',()=>loadBillsFromSupabase(false));
+$("loadMoreCustomersBtn").addEventListener('click',()=>loadCustomersFromSupabase(false));
+// helper: simple uuid v4
+function uuidv4(){return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;const v=c==='x'?r:(r&0x3|0x8);return v.toString(16);});}
+
+function ensureCustomerIds(){
+  let changed=false;
+  customers=customers.map(c=>{ if(!c._id){ c._id=uuidv4(); changed=true;} return c; });
+  if(changed) save(LS.customers,customers);
+}
+
+async function syncCustomersAndBillsToSupabase(){
+  const sup=getSupabaseClient(); if(!sup){toast('Save Supabase URL & key first');return;}
+  try{
+    ensureCustomerIds();
+    const custRows = customers.map(c=>({id:c._id,name:c.name,addr:c.addr,gst:c.gst}));
+    const billRows = bills.map(b=>({id:b.id,data:b}));
+    // upsert customers and bills into dedicated tables
+    const r1 = await sup.from('customers').upsert(custRows);
+    if(r1.error){toast('Customers sync failed: '+r1.error.message);console.error(r1.error);return;}
+    const r2 = await sup.from('bills').upsert(billRows);
+    if(r2.error){toast('Bills sync failed: '+r2.error.message);console.error(r2.error);return;}
+    toast('Customers and bills synced to Supabase');
+  }catch(err){toast('Sync error');console.error(err);}  
+}
+
+$("syncDataBtn").addEventListener('click',syncCustomersAndBillsToSupabase);
+$("listSupabaseBtn").addEventListener('click',listBackupsFromSupabase);
+$("loadSupabaseLatestBtn").addEventListener('click',loadLatestBackupFromSupabase);
+
+function initAccordion(container){
+  const items = container.querySelectorAll('.accordion-item');
+  items.forEach((item, idx)=>{
+    const btn = item.querySelector('.accordion-toggle');
+    const panel = item.querySelector('.accordion-panel');
+    // first item open by default
+    if(idx===0){
+      btn.classList.add('active');
+      panel.classList.add('active');
+    }
+    btn.addEventListener('click',()=>{
+      // close all others
+      items.forEach(otherItem=>{
+        const otherBtn = otherItem.querySelector('.accordion-toggle');
+        const otherPanel = otherItem.querySelector('.accordion-panel');
+        otherBtn.classList.remove('active');
+        otherPanel.classList.remove('active');
+      });
+      // open this one
+      btn.classList.add('active');
+      panel.classList.add('active');
+    });
+  });
+}
+
+updateSupabaseUI();
+initAccordion($("view-settings"));
+// modal close
+try{ $("closeBackupList").addEventListener('click',()=>$("backupListModal").style.display='none'); }catch(e){}
+
+/* SQL to create minimal tables for direct sync (run in Supabase SQL editor):
+
+CREATE TABLE public.customers (
+  id text PRIMARY KEY,
+  name text,
+  addr text,
+  gst text,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE public.bills (
+  id text PRIMARY KEY,
+  data jsonb,
+  created_at timestamptz DEFAULT now()
+);
+
+*/
+
+/* ============================================================
+   INIT
+   ============================================================ */
+fillSettings();
+refreshCustPicker();
+applyTaxUI();
+newBill();
+</script>
+</body>
+</html>

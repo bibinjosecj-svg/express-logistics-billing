@@ -706,7 +706,7 @@ function upsertCustomer(name,addr,gst,id=null){
 $("saveCustBtn").addEventListener("click",()=>{
   if(upsertCustomer($("custName").value,$("custAddr").value,$("custGst").value)){
     toast("Customer saved");
-    try{ if(getSupabaseClient()) setTimeout(syncCustomersAndBillsToSupabase,30); }catch(e){}
+    syncCustomersAndBillsToSupabase({quietSuccess:true});
   }
 });
 
@@ -806,7 +806,7 @@ $("saveBillBtn").addEventListener("click",()=>{
   save(LS.bills,bills);
   $("editingNote").textContent="Saved ✓ (bill "+b.invNo+")";
   toast("Bill saved");
-  try{ if(getSupabaseClient()) setTimeout(syncCustomersAndBillsToSupabase,30); }catch(e){}
+  syncCustomersAndBillsToSupabase({quietSuccess:true});
 });
 
 $("printBillBtn").addEventListener("click",()=>{
@@ -953,7 +953,7 @@ $("modalAddCustBtn").addEventListener("click",()=>{
     $("createCustomerModal").querySelector('h3').textContent='Create customer';
     $("modalAddCustBtn").textContent='＋ Create';
     renderCustomers(); toast(wasEdit ? 'Customer saved' : 'Customer created');
-    try{ if(getSupabaseClient()) setTimeout(syncCustomersAndBillsToSupabase,30); }catch(e){}
+    syncCustomersAndBillsToSupabase({quietSuccess:true});
   }
 });
 
@@ -1192,19 +1192,29 @@ function ensureCustomerIds(){
   if(changed) save(LS.customers,customers);
 }
 
-async function syncCustomersAndBillsToSupabase(){
-  const sup=getSupabaseClient(); if(!sup){toast('Save Supabase URL & key first');return;}
+async function syncCustomersAndBillsToSupabase(options={}){
+  const quietSuccess = !!options.quietSuccess;
+  const sup=getSupabaseClient(); if(!sup){if(!quietSuccess) toast('Save Supabase URL & key first');return false;}
   try{
     ensureCustomerIds();
     const custRows = customers.map(c=>({id:c._id,name:c.name,addr:c.addr,gst:c.gst}));
     const billRows = bills.map(b=>({id:b.id,data:b}));
-    // upsert customers and bills into dedicated tables
-    const r1 = await sup.from('customers').upsert(custRows);
-    if(r1.error){toast('Customers sync failed: '+r1.error.message);console.error(r1.error);return;}
-    const r2 = await sup.from('bills').upsert(billRows);
-    if(r2.error){toast('Bills sync failed: '+r2.error.message);console.error(r2.error);return;}
-    toast('Customers and bills synced to Supabase');
-  }catch(err){toast('Sync error');console.error(err);}  
+    const errors = [];
+    if(custRows.length){
+      const r1 = await sup.from('customers').upsert(custRows,{onConflict:'id'});
+      if(r1.error){errors.push('Customers: '+r1.error.message);console.error(r1.error);}
+    }
+    if(billRows.length){
+      const r2 = await sup.from('bills').upsert(billRows,{onConflict:'id'});
+      if(r2.error){errors.push('Bills: '+r2.error.message);console.error(r2.error);}
+    }
+    if(errors.length){
+      toast('Supabase sync failed: '+errors.join(' | '));
+      return false;
+    }
+    if(!quietSuccess) toast('Customers and bills synced to Supabase');
+    return true;
+  }catch(err){toast('Supabase sync error: '+(err.message||err));console.error(err);return false;}  
 }
 
 $("syncDataBtn").addEventListener('click',syncCustomersAndBillsToSupabase);

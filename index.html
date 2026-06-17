@@ -189,7 +189,9 @@
     body{background:#fff}
     header.topbar,main,.toast{display:none !important}
     #print-area{display:block !important}
-    .bill{border:2px solid #000;box-shadow:none;width:100%}
+    .bill{border:2px solid #000;box-shadow:none;width:100%;min-height:calc(297mm - 24mm);display:flex;flex-direction:column}
+    .bill table.b-items{flex:1}
+    .bill table.b-items tbody{height:100%}
     @page{size:A4;margin:12mm}
   }
 </style>
@@ -575,7 +577,7 @@ function addRow(data={}){
   tr.innerHTML=`
     <td class="rownum"></td>
     <td><input type="date" class="i-date" value="${data.date||todayISO()}"></td>
-    <td><input class="i-hsn" value="${data.hsn||""}" placeholder="9965"></td>
+    <td><input class="i-hsn" value="9965" readonly></td>
     <td><input class="i-veh" value="${(data.veh||"").toUpperCase()}" placeholder="TS 09 UB 8049"></td>
     <td><textarea class="i-part" rows="1" placeholder="Transportation of goods…">${data.part||""}</textarea></td>
     <td class="num"><input type="number" step="0.01" class="i-amt num" style="text-align:right" value="${data.amt??""}" placeholder="0.00"></td>
@@ -596,7 +598,7 @@ function renumber(){[...$("itemsBody").children].forEach((tr,i)=>tr.querySelecto
 function readItems(){
   return [...$("itemsBody").children].map(tr=>({
     date:tr.querySelector(".i-date").value,
-    hsn:tr.querySelector(".i-hsn").value.trim(),
+    hsn:"9965",
     veh:tr.querySelector(".i-veh").value.trim().toUpperCase(),
     part:tr.querySelector(".i-part").value.trim(),
     amt:Math.max(0,Number(tr.querySelector(".i-amt").value)||0)
@@ -619,6 +621,14 @@ function taxLabels(){
   return [null,null];
 }
 function applyTaxUI(){
+  if($("taxType").value==="inter"){
+    $("rate1").value=18;
+    $("rate1").readOnly=true;
+    $("rate2").readOnly=false;
+  } else {
+    $("rate1").readOnly=false;
+    $("rate2").readOnly=false;
+  }
   const [l1,l2]=taxLabels();
   $("rate1Wrap").style.display = l1?"flex":"none";
   $("rate2Wrap").style.display = l2?"flex":"none";
@@ -650,7 +660,8 @@ function recalc(){
   $("totalsBox").innerHTML=html;
   $("wordsBox").textContent = "₹ in words:  "+numToWords(t.grand);
 }
-["taxType","rate1","rate2","roundOff","carrying","discount"].forEach(id=>$(id).addEventListener("input",e=>{if(id==="taxType")applyTaxUI(); if(Number($(id).value)<0) $(id).value='0'; recalc();}));
+["taxType","rate1","rate2","roundOff","carrying","discount"].forEach(id=>$(id).addEventListener("input",e=>{if(id==="taxType")applyTaxUI(); if($("taxType").value==="inter" && id==="rate1") $("rate1").value=18; if(Number($(id).value)<0) $(id).value='0'; recalc();}));
+$("taxType").addEventListener("change",()=>{applyTaxUI();recalc();});
 $("autoRoundBtn").addEventListener("click",()=>{
   const t=computeTotals();
   const before=t.sub+t.t1+t.t2;
@@ -760,7 +771,7 @@ function gatherBill(){
     invNo:$("invNo").value.trim(), fy:$("invFY").value.trim(), date:$("invDate").value,
     cust:{name:$("custName").value.trim(),addr:$("custAddr").value.trim(),gst:$("custGst").value.trim()},
     items:readItems(),
-    taxType:$("taxType").value, rate1:Number($("rate1").value)||0, rate2:Number($("rate2").value)||0,
+    taxType:$("taxType").value, rate1:$("taxType").value==="inter" ? 18 : Number($("rate1").value)||0, rate2:Number($("rate2").value)||0,
     carrying:Number($("carrying").value)||0,
     discount:Number($("discount").value)||0,
     roundOff:Number($("roundOff").value)||0,
@@ -772,7 +783,7 @@ function loadBill(b){
   editingId=b.id;
   $("invNo").value=b.invNo; $("invFY").value=b.fy; $("invDate").value=b.date;
   $("custName").value=b.cust.name; $("custAddr").value=b.cust.addr; $("custGst").value=b.cust.gst;
-  $("taxType").value=b.taxType; $("rate1").value=b.rate1; $("rate2").value=b.rate2; $("carrying").value=b.carrying||0; $("roundOff").value=b.roundOff;
+  $("taxType").value=b.taxType; $("rate1").value=b.taxType==="inter" ? 18 : b.rate1; $("rate2").value=b.rate2; $("carrying").value=b.carrying||0; $("roundOff").value=b.roundOff;
   $("itemsBody").innerHTML=""; (b.items.length?b.items:[{}]).forEach(addRow);
   applyTaxUI(); recalc();
   $("editingNote").textContent="Editing saved bill "+(b.invNo||b.id);
@@ -822,7 +833,7 @@ function renderBillHTML(b){
     <tr>
       <td class="r-no">${idx+1}</td>
       <td>${i.date?fmtDate(i.date):""}</td>
-      <td>${esc(i.hsn)}</td>
+      <td>${esc("9965")}</td>
       <td>${esc(i.veh)}</td>
       <td>${esc(i.part).replace(/\n/g,"<br>")}</td>
       <td class="r-amt">${i.amt?money(i.amt):""}</td>

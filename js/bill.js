@@ -149,11 +149,16 @@ function renderBillHTML(b){
       </div>
       <div class="b-sign">
         <div>For ${esc(s.name)}</div>
-        ${s.seal?`<img src="${s.seal}" class="seal">`:`<div style="height:60px"></div>`}
+        ${s.seal?sealHTML(s,b.date?fmtDate(b.date):""):`<div style="height:60px"></div>`}
         <div>Authorised signatory</div>
       </div>
     </div>
   </div>`;
+}
+/* Seal image with the invoice date centred on its dotted "Date" line (see .seal-date in styles.css). */
+function sealHTML(s,dateText){
+  const date = dateText ? `<span class="seal-date">${esc(dateText)}</span>` : "";
+  return `<div class="seal-wrap"><img src="${s.seal}" class="seal">${date}</div>`;
 }
 function fmtDate(iso){const [y,m,d]=iso.split("-");return `${d}.${m}.${y}`;}
 

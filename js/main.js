@@ -6,3 +6,4 @@ fillSettings();
 refreshCustPicker();
 applyTaxUI();
 newBill();
+initAuth();

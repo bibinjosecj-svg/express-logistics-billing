@@ -203,10 +203,23 @@ table.pro .addr{white-space:pre-line;color:var(--muted);font-size:13px;max-width
 .bill.pdf{width:100%;aspect-ratio:194/279;display:flex;flex-direction:column}
 .bill.pdf table.b-items{flex:1;height:100%}
 .bill .seal{max-height:80px;max-width:140px;object-fit:contain;margin:6px 0 2px auto;display:block}
+/* Seal with the invoice date centred on its dotted "Date" line (matches assets/seal.png) */
+.seal-wrap{position:relative;width:fit-content;margin:6px 0 2px auto;line-height:0}
+.seal-wrap .seal{max-height:100px;max-width:140px;object-fit:contain;margin:0;display:block}
+.seal-date{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);font-size:9px;font-weight:700;color:#000;white-space:nowrap;line-height:1}
+
+/* ---------- Login ---------- */
+.login-screen[hidden]{display:none}
+.login-screen{position:fixed;inset:0;z-index:1000;background:var(--bg,#eef3f9);display:flex;align-items:center;justify-content:center;padding:16px}
+.login-card{background:#fff;width:100%;max-width:360px;padding:26px 22px;border-radius:14px;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;gap:12px}
+.login-card h2{margin:0;color:var(--brand)}
+.login-sub{margin:0 0 6px;color:var(--muted)}
+.login-error{color:#c0392b;min-height:1em;font-size:13px}
+.login-card .btn{justify-content:center}
 
 @media print{
   body{background:#fff}
-  header.topbar,main,.toast{display:none !important}
+  header.topbar,main,.toast,.login-screen{display:none !important}
   /* margin:0 leaves no room for the browser's header/footer (date, title, URL, page no.); the 12mm page margin is applied here instead */
   #print-area{display:block !important;padding:12mm}
   .bill{border:2px solid #000;box-shadow:none;width:100%;min-height:calc(297mm - 24mm);display:flex;flex-direction:column}

@@ -46,6 +46,7 @@ let settings = Object.assign({}, DEFAULT_SETTINGS, load(LS.settings,{}));
 let customers = normalizeArray(load(LS.customers,[]));
 let bills = normalizeArray(load(LS.bills,[]));
 let editingId = null; // id of bill being edited, else null
+let currentUser = null; // Supabase user once logged in (see auth.js)
 
 /* ---------- Number to words (Indian system) ---------- */
 function numToWords(num){

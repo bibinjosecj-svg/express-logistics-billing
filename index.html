@@ -252,8 +252,7 @@
                 <div class="row-actions" style="align-items:center">
                   <img id="setSealPrev" class="logo-prev" style="display:none" alt="seal">
                   <button class="btn danger sm" id="setSealClear" style="display:none">Remove seal</button>
-                </div>
-              </div>
+                </div>              </div>
             </div>
           </div>
         </div>
@@ -289,12 +288,11 @@
 
             <div style="margin-top:12px;border-top:1px dashed var(--line);padding-top:12px">
               <h3 style="margin:0 0 8px 0;font-size:13px;color:var(--brand)">Cloud sync (Supabase)</h3>
-              <div class="grid g2">
-                <label class="field">Supabase URL<input id="supabaseUrl" value="https://gamnwecmnqadyhnbrbli.supabase.co" placeholder="https://xyzcompany.supabase.co"></label>
-                <label class="field">Anon key<input id="supabaseKey" placeholder="anon key"></label>
+              <div class="row-actions" style="align-items:center">
+                <span>Logged in as <b id="authEmail"></b></span>
+                <button class="btn danger sm" id="logoutBtn">Log out</button>
               </div>
               <div class="row-actions" style="margin-top:8px">
-                <button class="btn primary sm" id="saveSupabaseBtn">Connect & save</button>
                 <button class="btn sm" id="checkDbSyncBtn">🔎 Check DB sync</button>
                 <button class="btn ok sm" id="uploadSupabaseBtn">⬆️ Upload backup</button>
                 <button class="btn ok sm" id="syncDataBtn">🔁 Sync customers & bills</button>
@@ -328,7 +326,7 @@
                 </div>
               </div>
             </div>
-            <p class="hint" style="margin-bottom:0">Settings = company name, logo, bank details, financial year and Supabase connection. Supabase backups can be restored with "Load latest" or removed from "List backups".</p>
+            <p class="hint" style="margin-bottom:0">Settings = company name, logo, seal, bank details and financial year (saved on this device only). Supabase backups can be restored with "Load latest" or removed from "List backups".</p>
           </div>
         </div>
       </div>
@@ -350,12 +348,21 @@
     <div id="backupListBody" style="display:flex;flex-direction:column;gap:10px"></div>
   </div>
 </div>
-<!-- load supabase client as an ES module and expose factory to window -->
-<script type="module">
-  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-  window.createSupabaseClient = createClient;
-</script>
+<!-- ============ LOGIN ============ -->
+<div id="loginScreen" class="login-screen">
+  <form id="loginForm" class="login-card">
+    <h2>Express Logistics</h2>
+    <p class="login-sub">Log in to create and view bills</p>
+    <label class="field">Email<input id="loginEmail" type="email" autocomplete="username" required></label>
+    <label class="field">Password<input id="loginPassword" type="password" autocomplete="current-password" required></label>
+    <div id="loginError" class="login-error"></div>
+    <button class="btn primary" id="loginBtn" type="submit">Log in</button>
+  </form>
+</div>
 
+<!-- Supabase client (UMD build, defines window.supabase) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
 <script src="js/core.js"></script>
 <script src="js/tabs.js"></script>
 <script src="js/items.js"></script>
@@ -365,6 +372,7 @@
 <script src="js/bill-list.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/supabase.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

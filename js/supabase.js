@@ -1,15 +1,12 @@
 "use strict";
-const LS_SUP="elt_supabase";
-function saveSupabaseCredsObj(o){localStorage.setItem(LS_SUP,JSON.stringify(o));}
-function loadSupabaseCredsObj(){try{return JSON.parse(localStorage.getItem(LS_SUP))||{};}catch(e){return {};}}
-function updateSupabaseUI(){const s=loadSupabaseCredsObj(); if(s.url) $("supabaseUrl").value=s.url; if(s.key) $("supabaseKey").value=s.key; const st=$("supabaseStatus"); if(s.url && s.key){ st.textContent = "Connected (saved)"; } else if(s.url || s.key){ st.textContent = "Incomplete Supabase setup"; } else { st.textContent = "Not connected"; }}
+function updateSupabaseUI(){ $("supabaseStatus").textContent = currentUser ? "Connected" : "Not logged in"; }
 
 async function checkSupabaseSyncStatus(){
   const sup=getSupabaseClient();
   if(!sup){
     updateSupabaseUI();
-    toast('Supabase URL and anon key are required before checking sync');
-    return {connected:false, tables:{customers:false,bills:false}, message:'Missing Supabase credentials'};
+    toast('Please log in first');
+    return {connected:false, tables:{customers:false,bills:false}, message:'Not logged in'};
   }
   try{
     const [customersResult, billsResult] = await Promise.all([
@@ -46,29 +43,19 @@ async function checkSupabaseSyncStatus(){
   }
 }
 
-function getSupabaseClient(){
-  const s = loadSupabaseCredsObj();
-  const urlField = $("supabaseUrl");
-  const keyField = $("supabaseKey");
-  const url = urlField ? urlField.value.trim() : s.url;
-  const key = keyField ? keyField.value.trim() : s.key;
-  if(url && key && (url !== s.url || key !== s.key)){
-    saveSupabaseCredsObj({url,key});
-    updateSupabaseUI();
-    s.url = url; s.key = key;
-  }
-  if(!s.url||!s.key) return null;
-  if(!window._supabaseClient || window._supabaseClient._supabaseUrl!==s.url || window._supabaseClient._supabaseKey!==s.key){
-    if(!window.createSupabaseClient){toast('Supabase client loader not available'); return null;}
-    window._supabaseClient = window.createSupabaseClient(s.url,s.key);
-    window._supabaseClient._supabaseUrl=s.url;
-    window._supabaseClient._supabaseKey=s.key;
-  }
+/* Raw client (used for login). Credentials come from js/config.js. */
+function supabaseClient(){
+  if(!window.supabase || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.startsWith("PASTE_")) return null;
+  if(!window._supabaseClient) window._supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   return window._supabaseClient;
+}
+/* Client for data access — only once logged in (the database rejects anonymous requests). */
+function getSupabaseClient(){
+  return currentUser ? supabaseClient() : null;
 }
 
 async function uploadBackupToSupabase(){
-  const sup=getSupabaseClient(); if(!sup){toast('Save Supabase URL & key first');return;}
+  const sup=getSupabaseClient(); if(!sup){toast('Please log in first');return;}
   const payload={settings,customers,bills,_v:1};
   try{
     const name='billing-backup-'+todayISO();
@@ -80,7 +67,7 @@ async function uploadBackupToSupabase(){
 }
 
 async function listBackupsFromSupabase(){
-  const sup=getSupabaseClient(); if(!sup){toast('Save Supabase URL & key first');return;}
+  const sup=getSupabaseClient(); if(!sup){toast('Please log in first');return;}
   try{
     const res=await sup.from('backups').select('id,name,created_at').order('created_at',{ascending:false}).limit(200);
     if(res.error){toast('List failed: '+res.error.message);console.error(res.error);return;}
@@ -125,7 +112,7 @@ async function listBackupsFromSupabase(){
 }
 
 async function loadLatestBackupFromSupabase(){
-  const sup=getSupabaseClient(); if(!sup){toast('Save Supabase URL & key first');return;}
+  const sup=getSupabaseClient(); if(!sup){toast('Please log in first');return;}
   try{
     const list=await sup.from('backups').select('id,created_at').order('created_at',{ascending:false}).limit(1);
     if(list.error||!list.data||!list.data.length){toast('No backups found');return;}
@@ -142,7 +129,7 @@ async function loadLatestBackupFromSupabase(){
 }
 
 async function loadBillsFromSupabase(reset=false){
-  const sup=getSupabaseClient(); if(!sup){toast('Save Supabase URL & key first');return;}
+  const sup=getSupabaseClient(); if(!sup){toast('Please log in first');return;}
   try{
     if(reset){
       supabaseBillsPage = 0;
@@ -169,7 +156,7 @@ async function loadBillsFromSupabase(reset=false){
 }
 
 async function loadCustomersFromSupabase(reset=false){
-  const sup=getSupabaseClient(); if(!sup){toast('Save Supabase URL & key first');return;}
+  const sup=getSupabaseClient(); if(!sup){toast('Please log in first');return;}
   try{
     if(reset){
       supabaseCustomersPage = 0;
@@ -203,11 +190,6 @@ function updateLoadMoreButtons(){
 }
 
 // Wire UI buttons
-$("saveSupabaseBtn").addEventListener('click',async()=>{
-  const url=$("supabaseUrl").value.trim(), key=$("supabaseKey").value.trim();
-  if(!url||!key){toast('Enter URL and anon key');return;} saveSupabaseCredsObj({url,key}); updateSupabaseUI(); toast('Supabase credentials saved');
-  await checkSupabaseSyncStatus();
-});
 $("checkDbSyncBtn").addEventListener('click',checkSupabaseSyncStatus);
 $("uploadSupabaseBtn").addEventListener('click',uploadBackupToSupabase);
 $("loadMoreBillsBtn").addEventListener('click',()=>loadBillsFromSupabase(false));
@@ -223,7 +205,7 @@ function ensureCustomerIds(){
 
 async function syncCustomersAndBillsToSupabase(options={}){
   const quietSuccess = !!options.quietSuccess;
-  const sup=getSupabaseClient(); if(!sup){if(!quietSuccess) toast('Save Supabase URL & key first');return false;}
+  const sup=getSupabaseClient(); if(!sup){if(!quietSuccess) toast('Please log in first');return false;}
   try{
     ensureCustomerIds();
     const custRows = customers.map(c=>({id:c._id,name:c.name,addr:c.addr,gst:c.gst,phone:c.phone||null}));
@@ -296,37 +278,4 @@ initAccordion($("view-settings"));
 // modal close
 try{ $("closeBackupList").addEventListener('click',()=>$("backupListModal").style.display='none'); }catch(e){}
 
-/* SQL to create minimal tables and allow writes for anon key (run in Supabase SQL editor):
-
-CREATE TABLE public.customers (
-  id text PRIMARY KEY,
-  name text,
-  addr text,
-  gst text,
-  phone text,
-  created_at timestamptz DEFAULT now()
-);
--- existing databases: ALTER TABLE public.customers ADD COLUMN phone text;
-
-CREATE TABLE public.bills (
-  id text PRIMARY KEY,
-  data jsonb,
-  created_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.bills ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow anon full access to customers"
-  ON public.customers
-  FOR ALL
-  USING (true)
-  WITH CHECK (true);
-
-CREATE POLICY "Allow anon full access to bills"
-  ON public.bills
-  FOR ALL
-  USING (true)
-  WITH CHECK (true);
-
-*/
+/* Database tables and login-only access rules: see supabase-setup.sql */

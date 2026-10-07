@@ -206,6 +206,10 @@ table.pro .addr{white-space:pre-line;color:var(--muted);font-size:13px;max-width
 /* Seal with the invoice date centred on its dotted "Date" line (matches assets/seal.png) */
 .seal-wrap{position:relative;width:fit-content;margin:6px 0 2px auto;line-height:0}
 .seal-wrap .seal{max-height:100px;max-width:140px;object-fit:contain;margin:0;display:block}
+/* Signature (left) + seal (right) above "Authorised signatory" */
+.bill .sign-row{display:flex;justify-content:flex-end;align-items:flex-end;gap:8px;margin:6px 0 2px}
+.bill .sign-row .seal-wrap{margin:0}
+.bill .sign-img{max-height:60px;max-width:110px;object-fit:contain;display:block}
 .seal-date{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);font-size:9px;font-weight:700;color:#000;white-space:nowrap;line-height:1}
 
 /* ---------- Login ---------- */

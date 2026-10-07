@@ -149,7 +149,9 @@ function renderBillHTML(b){
       </div>
       <div class="b-sign">
         <div>For ${esc(s.name)}</div>
-        ${s.seal?sealHTML(s,b.date?fmtDate(b.date):""):`<div style="height:60px"></div>`}
+        ${(s.seal||s.sign)
+          ? `<div class="sign-row">${s.sign?`<img src="${s.sign}" class="sign-img">`:""}${s.seal?sealHTML(s,b.date?fmtDate(b.date):""):""}</div>`
+          : `<div style="height:60px"></div>`}
         <div>Authorised signatory</div>
       </div>
     </div>

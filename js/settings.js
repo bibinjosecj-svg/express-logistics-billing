@@ -15,6 +15,8 @@ function fillSettings(){
   else{$("setLogoPrev").style.display="none";$("setLogoClear").style.display="none";}
   if(settings.seal){$("setSealPrev").src=settings.seal;$("setSealPrev").style.display="inline-block";$("setSealClear").style.display="inline-block";}
   else{$("setSealPrev").style.display="none";$("setSealClear").style.display="none";}
+  if(settings.sign){$("setSignPrev").src=settings.sign;$("setSignPrev").style.display="inline-block";$("setSignClear").style.display="inline-block";}
+  else{$("setSignPrev").style.display="none";$("setSignClear").style.display="none";}
 }
 $("saveSettingsBtn").addEventListener("click",()=>{
   Object.assign(settings,{
@@ -42,20 +44,52 @@ function readImageFile(f,done){
   };
   r.readAsDataURL(f);
 }
-function wireImageSetting(key,fileId,clearId,label){
+/* Signature photos: remove the paper background (→ transparent, prints as white, lets the seal show
+   through), darken the ink and crop tight around the strokes. */
+function cleanSignature(url,done){
+  const img=new Image();
+  img.onload=()=>{
+    const c=document.createElement("canvas"); c.width=img.width; c.height=img.height;
+    const x=c.getContext("2d"); x.drawImage(img,0,0);
+    const id=x.getImageData(0,0,c.width,c.height), d=id.data, n=c.width*c.height;
+    const lum=new Float32Array(n);
+    for(let i=0;i<n;i++){const p=i*4; lum[i]=d[p+3]<10?255:0.299*d[p]+0.587*d[p+1]+0.114*d[p+2];}
+    // paper brightness = 85th percentile, so uneven lighting/grey photos still count as background
+    const bg=Float32Array.from(lum).sort()[Math.floor(n*0.85)];
+    let minX=c.width,minY=c.height,maxX=-1,maxY=-1;
+    for(let i=0;i<n;i++){
+      const p=i*4, a=Math.max(0,Math.min(1,(bg-30-lum[i])/60));
+      if(a<=0){d[p+3]=0;continue;}
+      d[p]*=0.55; d[p+1]*=0.55; d[p+2]*=0.55; d[p+3]=Math.round(255*a);
+      const px=i%c.width, py=(i/c.width)|0;
+      if(px<minX)minX=px; if(px>maxX)maxX=px; if(py<minY)minY=py; if(py>maxY)maxY=py;
+    }
+    if(maxX<0){done(url);return;} // nothing detected — keep original
+    x.putImageData(id,0,0);
+    const pad=4; minX=Math.max(0,minX-pad); minY=Math.max(0,minY-pad);
+    maxX=Math.min(c.width-1,maxX+pad); maxY=Math.min(c.height-1,maxY+pad);
+    const o=document.createElement("canvas"); o.width=maxX-minX+1; o.height=maxY-minY+1;
+    o.getContext("2d").drawImage(c,minX,minY,o.width,o.height,0,0,o.width,o.height);
+    done(o.toDataURL("image/png"));
+  };
+  img.onerror=()=>done(url);
+  img.src=url;
+}
+function wireImageSetting(key,fileId,clearId,label,process){
   $(fileId).addEventListener("change",e=>{
     const f=e.target.files[0]; if(!f)return;
-    readImageFile(f,url=>{
+    readImageFile(f,raw=>(process||((u,cb)=>cb(u)))(raw,url=>{
       settings[key]=url;
       try{save(LS.settings,settings);}catch(err){settings[key]="";toast(label+" image too large — try a smaller file");return;}
       fillSettings();toast(label+" added");
-    });
+    }));
     e.target.value="";
   });
   $(clearId).addEventListener("click",()=>{settings[key]="";save(LS.settings,settings);fillSettings();toast(label+" removed");});
 }
 wireImageSetting("logo","setLogoFile","setLogoClear","Logo");
 wireImageSetting("seal","setSealFile","setSealClear","Seal");
+wireImageSetting("sign","setSignFile","setSignClear","Signature",cleanSignature);
 
 /* ---------- Backup export / import ---------- */
 $("exportBtn").addEventListener("click",()=>{

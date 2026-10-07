@@ -246,13 +246,23 @@
                 </div>
               </div>
               <div>
-                <label class="field">Seal / signature <span style="text-transform:none;font-weight:400">(printed bottom-right, above Authorised signatory)</span>
+                <label class="field">Seal <span style="text-transform:none;font-weight:400">(printed bottom-right, above Authorised signatory)</span>
                   <input id="setSealFile" type="file" accept="image/*">
                 </label>
                 <div class="row-actions" style="align-items:center">
                   <img id="setSealPrev" class="logo-prev" style="display:none" alt="seal">
                   <button class="btn danger sm" id="setSealClear" style="display:none">Remove seal</button>
-                </div>              </div>
+                </div>
+              </div>
+              <div>
+                <label class="field">Signature <span style="text-transform:none;font-weight:400">(printed left of the seal; use a PNG with transparent or white background)</span>
+                  <input id="setSignFile" type="file" accept="image/*">
+                </label>
+                <div class="row-actions" style="align-items:center">
+                  <img id="setSignPrev" class="logo-prev" style="display:none" alt="signature">
+                  <button class="btn danger sm" id="setSignClear" style="display:none">Remove signature</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

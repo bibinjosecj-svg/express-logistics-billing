@@ -39,7 +39,7 @@ const DEFAULT_SETTINGS = {
   bankName:"EXPRESS LOGISTICS & TRANSPORTS",
   bank:"CANARA BANK", branch:"IRINJALAKUDA",
   acc:"1200 2933 5780", ifsc:"CNRB0000807",
-  fy:"2026-2027", lastInv:3, logo:"", seal:""
+  fy:"2026-2027", lastInv:3, logo:"", seal:"", sign:""
 };
 
 let settings = Object.assign({}, DEFAULT_SETTINGS, load(LS.settings,{}));

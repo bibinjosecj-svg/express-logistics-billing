@@ -35,7 +35,7 @@ function upsertCustomer(name,addr,gst,phone,id=null){
   if(phone && !whatsappNumber(phone)){toast("Phone number doesn't look valid — enter 10 digits or include country code");return false;}
   const searchId = id || null;
   const i = searchId ? customers.findIndex(c=>(c._id||c.id)===searchId) : customers.findIndex(c=>c.name.toLowerCase()===name.toLowerCase());
-  const rec={name,addr:addr.trim(),gst:gst.trim(),phone};
+  const rec={name,addr:addr.trim(),gst:gst.trim(),phone,_synced:false};
   if(i>=0){
     rec._id = customers[i]._id || customers[i].id || null;
     customers[i]=Object.assign({},customers[i],rec);

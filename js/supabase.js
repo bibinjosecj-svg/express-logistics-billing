@@ -95,7 +95,7 @@ async function listBackupsFromSupabase(){
           if(rec.error){toast('Load failed');console.error(rec.error);return;}
           const d=rec.data.data;
           settings=Object.assign({},DEFAULT_SETTINGS,d.settings||{});
-          customers=d.customers||[]; bills=d.bills||[];
+          customers=markUnsynced(d.customers||[]); bills=markUnsynced(d.bills||[]);
           save(LS.settings,settings);save(LS.customers,customers);save(LS.bills,bills);
           fillSettings();cleanStoredImages();refreshCustPicker();newBill();toast('Backup loaded'); modal.style.display='none';
         }else if(act==='del'){
@@ -122,7 +122,7 @@ async function loadLatestBackupFromSupabase(){
     const d=rec.data.data;
     if(!confirm('Loading will REPLACE local data. Continue?')) return;
     settings=Object.assign({},DEFAULT_SETTINGS,d.settings||{});
-    customers=d.customers||[]; bills=d.bills||[];
+    customers=markUnsynced(d.customers||[]); bills=markUnsynced(d.bills||[]);
     save(LS.settings,settings);save(LS.customers,customers);save(LS.bills,bills);
     fillSettings();cleanStoredImages();refreshCustPicker();newBill();toast('Backup loaded from Supabase');
   }catch(err){toast('Load error');console.error(err);}  
@@ -140,9 +140,12 @@ async function loadBillsFromSupabase(reset=false){
     const res = await sup.from('bills').select('id,data').order('created_at',{ascending:false}).range(start,end);
     if(res.error){toast('Load bills failed: '+res.error.message);console.error(res.error);return;}
     const rows = res.data||[];
+    if(reset){ const ids=await fetchAllIds(sup,'bills'); if(ids) bills=bills.filter(b=>!isSynced(b)||ids.has(b.id)); }
     const existing = new Map(bills.map(b=>[b.id,b]));
     rows.forEach(r=>{
-      const item = r.data;
+      const item = Object.assign({}, r.data, {_synced:true});
+      // keep a local edit that hasn't been uploaded yet; skip a bill whose delete is still in flight
+      if(!isSynced(existing.get(item.id)||{}) || deletingIds.has(item.id)) return;
       existing.set(item.id, item);
     });
     bills = Array.from(existing.values());
@@ -167,9 +170,12 @@ async function loadCustomersFromSupabase(reset=false){
     const res = await sup.from('customers').select('*').order('created_at',{ascending:false}).range(start,end);
     if(res.error){toast('Load customers failed: '+res.error.message);console.error(res.error);return;}
     const rows = res.data||[];
+    if(reset){ const ids=await fetchAllIds(sup,'customers'); if(ids) customers=customers.filter(c=>!isSynced(c)||ids.has(c._id||c.id)); }
     const existing = new Map(customers.map(c=>[(c._id||c.id),c]));
     rows.forEach(r=>{
-      const item = {name:r.name,addr:r.addr,gst:r.gst,phone:r.phone||"",_id:r.id};
+      // keep a local edit that hasn't been uploaded yet; skip a customer whose delete is still in flight
+      if(!isSynced(existing.get(r.id)||{}) || deletingIds.has(r.id)) return;
+      const item = {name:r.name,addr:r.addr,gst:r.gst,phone:r.phone||"",_id:r.id,_synced:true};
       existing.set(r.id, item);
     });
     customers = Array.from(existing.values());
@@ -198,20 +204,39 @@ $("loadMoreCustomersBtn").addEventListener('click',()=>loadCustomersFromSupabase
 function uuidv4(){return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;const v=c==='x'?r:(r&0x3|0x8);return v.toString(16);});}
 
 /* Local deletes alone get undone by the next load from Supabase, so remove the rows there too. */
+const deletingIds = new Set(); // loads ignore these until the cloud delete finishes
 async function deleteRowsFromSupabase(table,ids,label){
   ids=ids.filter(Boolean);
   const sup=getSupabaseClient(); if(!sup || !ids.length) return;
+  ids.forEach(id=>deletingIds.add(id));
   try{
     const res=await sup.from(table).delete().in('id',ids);
     if(res.error){toast(label+' removed here, but cloud delete failed: '+res.error.message);console.error(res.error);}
   }catch(err){toast(label+' removed here, but cloud delete failed');console.error(err);}
+  finally{ ids.forEach(id=>deletingIds.delete(id)); }
 }
 const deleteCustomersFromSupabase = ids => deleteRowsFromSupabase('customers',ids,'Customer');
 const deleteBillsFromSupabase = ids => deleteRowsFromSupabase('bills',ids,'Bill');
 
+/* _synced:false marks a record created/edited on this device and not uploaded yet. Only those are
+   uploaded, so a stale copy on another device can't re-create a record deleted elsewhere. Records with
+   no flag (saved before this existed) count as uploaded — the app always synced on save. */
+const isSynced = r => r._synced !== false;
+function markUnsynced(list){ return list.map(r=>Object.assign({}, r, {_synced:false})); }
+/* Every id in the table (paged, as Supabase returns at most 1000 rows per request); null on error. */
+async function fetchAllIds(sup,table){
+  const ids=new Set();
+  for(let from=0;;from+=1000){
+    const res=await sup.from(table).select('id').range(from,from+999);
+    if(res.error){console.error(res.error);return null;}
+    res.data.forEach(r=>ids.add(r.id));
+    if(res.data.length<1000) return ids;
+  }
+}
+
 function ensureCustomerIds(){
   let changed=false;
-  customers=customers.map(c=>{ if(!c._id){ c._id=uuidv4(); changed=true;} return c; });
+  customers=customers.map(c=>{ if(!c._id){ c._id=uuidv4(); c._synced=false; changed=true;} return c; });
   if(changed) save(LS.customers,customers);
 }
 
@@ -220,8 +245,9 @@ async function syncCustomersAndBillsToSupabase(options={}){
   const sup=getSupabaseClient(); if(!sup){if(!quietSuccess) toast('Please log in first');return false;}
   try{
     ensureCustomerIds();
-    const custRows = customers.map(c=>({id:c._id,name:c.name,addr:c.addr,gst:c.gst,phone:c.phone||null}));
-    const billRows = bills.map(b=>({id:b.id,data:b}));
+    const dirtyCust = customers.filter(c=>!isSynced(c)), dirtyBills = bills.filter(b=>!isSynced(b));
+    const custRows = dirtyCust.map(c=>({id:c._id,name:c.name,addr:c.addr,gst:c.gst,phone:c.phone||null}));
+    const billRows = dirtyBills.map(b=>{ const {_synced,...data}=b; return {id:b.id,data}; });
     const errors = [];
     if(custRows.length){
       let r1 = await sup.from('customers').upsert(custRows,{onConflict:'id'});
@@ -232,10 +258,12 @@ async function syncCustomersAndBillsToSupabase(options={}){
         r1 = await sup.from('customers').upsert(custRows.map(({phone,...rest})=>rest),{onConflict:'id'});
       }
       if(r1.error){errors.push('Customers: '+r1.error.message);console.error(r1.error);}
+      else { dirtyCust.forEach(c=>{c._synced=true;}); save(LS.customers,customers); }
     }
     if(billRows.length){
       const r2 = await sup.from('bills').upsert(billRows,{onConflict:'id'});
       if(r2.error){errors.push('Bills: '+r2.error.message);console.error(r2.error);}
+      else { dirtyBills.forEach(b=>{b._synced=true;}); save(LS.bills,bills); }
     }
     if(errors.length){
       const msg = errors.join(' | ');

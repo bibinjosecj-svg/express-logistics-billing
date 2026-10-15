@@ -234,7 +234,7 @@ $("importFile").addEventListener("change",e=>{
       const d=JSON.parse(r.result);
       if(!confirm("Importing will REPLACE current data with the backup. Continue?"))return;
       settings=Object.assign({},DEFAULT_SETTINGS,d.settings||{});
-      customers=d.customers||[]; bills=d.bills||[];
+      customers=markUnsynced(d.customers||[]); bills=markUnsynced(d.bills||[]);
       save(LS.settings,settings);save(LS.customers,customers);save(LS.bills,bills);
       fillSettings();cleanStoredImages();refreshCustPicker();newBill();toast("Backup imported");
     }catch(err){alert("Could not read backup file: "+err.message);}

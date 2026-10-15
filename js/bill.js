@@ -63,6 +63,7 @@ $("saveBillBtn").addEventListener("click",()=>{
   const b=gatherBill();
   if(!b.invNo){toast("Enter an invoice number");return;}
   bills = normalizeArray(bills);
+  b._synced=false; // uploaded by the sync below
   const idx=bills.findIndex(x=>x.id===b.id);
   if(idx>=0) bills[idx]=b; else bills.unshift(b);
   // bump auto-increment if this is a new, numeric, higher invoice

@@ -97,7 +97,7 @@ async function listBackupsFromSupabase(){
           settings=Object.assign({},DEFAULT_SETTINGS,d.settings||{});
           customers=d.customers||[]; bills=d.bills||[];
           save(LS.settings,settings);save(LS.customers,customers);save(LS.bills,bills);
-          fillSettings();refreshCustPicker();newBill();toast('Backup loaded'); modal.style.display='none';
+          fillSettings();cleanStoredImages();refreshCustPicker();newBill();toast('Backup loaded'); modal.style.display='none';
         }else if(act==='del'){
           if(!confirm('Delete this backup?'))return;
           const dres=await sup.from('backups').delete().eq('id',id);
@@ -124,7 +124,7 @@ async function loadLatestBackupFromSupabase(){
     settings=Object.assign({},DEFAULT_SETTINGS,d.settings||{});
     customers=d.customers||[]; bills=d.bills||[];
     save(LS.settings,settings);save(LS.customers,customers);save(LS.bills,bills);
-    fillSettings();refreshCustPicker();newBill();toast('Backup loaded from Supabase');
+    fillSettings();cleanStoredImages();refreshCustPicker();newBill();toast('Backup loaded from Supabase');
   }catch(err){toast('Load error');console.error(err);}  
 }
 
@@ -178,7 +178,7 @@ async function loadCustomersFromSupabase(reset=false){
     supabaseCustomersPage += 1;
     updateLoadMoreButtons();
     toast('Loaded '+rows.length+' customers from Supabase');
-    renderCustomers();
+    renderCustomers(); refreshCustPicker();
   }catch(err){toast('Load customers error');console.error(err);}  
 }
 
@@ -196,6 +196,18 @@ $("loadMoreBillsBtn").addEventListener('click',()=>loadBillsFromSupabase(false))
 $("loadMoreCustomersBtn").addEventListener('click',()=>loadCustomersFromSupabase(false));
 // helper: simple uuid v4
 function uuidv4(){return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;const v=c==='x'?r:(r&0x3|0x8);return v.toString(16);});}
+
+/* Local deletes alone get undone by the next load from Supabase, so remove the rows there too. */
+async function deleteRowsFromSupabase(table,ids,label){
+  ids=ids.filter(Boolean);
+  const sup=getSupabaseClient(); if(!sup || !ids.length) return;
+  try{
+    const res=await sup.from(table).delete().in('id',ids);
+    if(res.error){toast(label+' removed here, but cloud delete failed: '+res.error.message);console.error(res.error);}
+  }catch(err){toast(label+' removed here, but cloud delete failed');console.error(err);}
+}
+const deleteCustomersFromSupabase = ids => deleteRowsFromSupabase('customers',ids,'Customer');
+const deleteBillsFromSupabase = ids => deleteRowsFromSupabase('bills',ids,'Bill');
 
 function ensureCustomerIds(){
   let changed=false;

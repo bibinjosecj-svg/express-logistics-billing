@@ -75,6 +75,70 @@ function cleanSignature(url,done){
   img.onerror=()=>done(url);
   img.src=url;
 }
+/* Logo/seal: make the background colour (sampled from the image border) transparent, keeping the
+   artwork's own colours, then crop tight. flood=true only clears background connected to the border
+   (safe for logos); flood=false clears it everywhere (seals: the paper inside the stamp ring too). */
+function removeBackground(url,done,flood){
+  const img=new Image();
+  img.onload=()=>{
+    const w=img.width,h=img.height;
+    const c=document.createElement("canvas"); c.width=w; c.height=h;
+    const x=c.getContext("2d"); x.drawImage(img,0,0);
+    const id=x.getImageData(0,0,w,h), d=id.data;
+    const border=[];
+    for(let px=0;px<w;px++){border.push(px,(h-1)*w+px);}
+    for(let py=1;py<h-1;py++){border.push(py*w,py*w+w-1);}
+    const opaque=border.filter(i=>d[i*4+3]>=10);
+    if(opaque.length<border.length/2){done(url);return;} // already transparent
+    const med=k=>opaque.map(i=>d[i*4+k]).sort((a,b)=>a-b)[opaque.length>>1];
+    const bg=[med(0),med(1),med(2)];
+    const LO=30,HI=70; // colour distance: <=LO fully background, >=HI fully kept, soft edge between
+    const dist=p=>Math.max(Math.abs(d[p]-bg[0]),Math.abs(d[p+1]-bg[1]),Math.abs(d[p+2]-bg[2]));
+    const clear=i=>{
+      const p=i*4, a=Math.max(0,Math.min(1,(dist(p)-LO)/(HI-LO)));
+      if(a<1&&a>0){for(let k=0;k<3;k++) d[p+k]=Math.max(0,Math.min(255,(d[p+k]-bg[k]*(1-a))/a));} // un-blend the edge
+      d[p+3]=Math.round(d[p+3]*a);
+    };
+    if(flood){
+      const seen=new Uint8Array(w*h), stack=[];
+      border.forEach(i=>{if(dist(i*4)<HI){seen[i]=1;stack.push(i);}});
+      while(stack.length){
+        const i=stack.pop(), px=i%w;
+        clear(i);
+        [px>0?i-1:-1,px<w-1?i+1:-1,i-w,i+w].forEach(j=>{
+          if(j>=0&&j<w*h&&!seen[j]&&dist(j*4)<HI){seen[j]=1;stack.push(j);}
+        });
+      }
+    }else{
+      for(let i=0;i<w*h;i++) if(dist(i*4)<HI) clear(i);
+    }
+    let minX=w,minY=h,maxX=-1,maxY=-1;
+    for(let i=0;i<w*h;i++) if(d[i*4+3]>10){
+      const px=i%w,py=(i/w)|0;
+      if(px<minX)minX=px; if(px>maxX)maxX=px; if(py<minY)minY=py; if(py>maxY)maxY=py;
+    }
+    if(maxX<0){done(url);return;} // everything matched the background — keep original
+    x.putImageData(id,0,0);
+    const pad=2; minX=Math.max(0,minX-pad); minY=Math.max(0,minY-pad);
+    maxX=Math.min(w-1,maxX+pad); maxY=Math.min(h-1,maxY+pad);
+    const o=document.createElement("canvas"); o.width=maxX-minX+1; o.height=maxY-minY+1;
+    o.getContext("2d").drawImage(c,minX,minY,o.width,o.height,0,0,o.width,o.height);
+    done(o.toDataURL("image/png"));
+  };
+  img.onerror=()=>done(url);
+  img.src=url;
+}
+const cleanLogo=(url,done)=>removeBackground(url,done,true);
+const cleanSeal=(url,done)=>removeBackground(url,done,false);
+/* Logos/seals uploaded before background removal existed: clean them once. */
+function cleanStoredImages(){
+  if(settings.bgCleaned) return;
+  const jobs=[["logo",cleanLogo],["seal",cleanSeal]].filter(([k])=>settings[k]);
+  let left=jobs.length;
+  const finish=()=>{settings.bgCleaned=1;try{save(LS.settings,settings);}catch(e){} fillSettings();};
+  if(!left){finish();return;}
+  jobs.forEach(([k,fn])=>fn(settings[k],url=>{settings[k]=url;if(--left===0)finish();}));
+}
 function wireImageSetting(key,fileId,clearId,label,process){
   $(fileId).addEventListener("change",e=>{
     const f=e.target.files[0]; if(!f)return;
@@ -87,8 +151,8 @@ function wireImageSetting(key,fileId,clearId,label,process){
   });
   $(clearId).addEventListener("click",()=>{settings[key]="";save(LS.settings,settings);fillSettings();toast(label+" removed");});
 }
-wireImageSetting("logo","setLogoFile","setLogoClear","Logo");
-wireImageSetting("seal","setSealFile","setSealClear","Seal");
+wireImageSetting("logo","setLogoFile","setLogoClear","Logo",cleanLogo);
+wireImageSetting("seal","setSealFile","setSealClear","Seal",cleanSeal);
 wireImageSetting("sign","setSignFile","setSignClear","Signature",cleanSignature);
 
 /* ---------- Backup export / import ---------- */
@@ -172,7 +236,7 @@ $("importFile").addEventListener("change",e=>{
       settings=Object.assign({},DEFAULT_SETTINGS,d.settings||{});
       customers=d.customers||[]; bills=d.bills||[];
       save(LS.settings,settings);save(LS.customers,customers);save(LS.bills,bills);
-      fillSettings();refreshCustPicker();newBill();toast("Backup imported");
+      fillSettings();cleanStoredImages();refreshCustPicker();newBill();toast("Backup imported");
     }catch(err){alert("Could not read backup file: "+err.message);}
   };
   r.readAsText(f);

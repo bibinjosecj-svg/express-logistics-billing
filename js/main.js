@@ -3,6 +3,7 @@
    INIT
    ============================================================ */
 fillSettings();
+cleanStoredImages();
 refreshCustPicker();
 applyTaxUI();
 newBill();

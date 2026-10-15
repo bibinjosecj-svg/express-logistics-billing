@@ -3,17 +3,18 @@
    CUSTOMERS
    ============================================================ */
 function refreshCustPicker(){
+  ensureCustomerIds(); // options are keyed by id, not array index, so deletes can't shift the selection
   const sel=$("custPick"); const cur=sel.value;
   sel.innerHTML='<option value="">— Choose a saved customer —</option>';
   customers.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach((c)=>{
-    const i=customers.indexOf(c);
-    const o=document.createElement("option"); o.value=i; o.textContent=c.name+(c.gst?`  ·  ${c.gst}`:"");
+    const o=document.createElement("option"); o.value=c._id||c.id; o.textContent=c.name+(c.gst?`  ·  ${c.gst}`:"");
     sel.appendChild(o);
   });
   sel.value=cur;
+  if(sel.value!==cur) $("selectedFlag").classList.remove("show"); // the picked customer was deleted
 }
 $("custPick").addEventListener("change",e=>{
-  const c=customers[e.target.value];
+  const c=customers.find(x=>(x._id||x.id)===e.target.value);
   if(c){
     $("custName").value=c.name;$("custAddr").value=c.addr;$("custGst").value=c.gst;$("custPhone").value=c.phone||"";
     $("selectedFlag").classList.add("show");
@@ -74,7 +75,7 @@ function renderCustomers(){
       </div></td>`;
     tr.querySelector('[data-a="use"]').addEventListener("click",()=>{
       $("custName").value=c.name;$("custAddr").value=c.addr;$("custGst").value=c.gst;$("custPhone").value=c.phone||"";
-      $("custPick").value=i;$("selectedFlag").classList.add("show");
+      $("custPick").value=c._id||c.id;$("selectedFlag").classList.add("show");
       document.querySelector('nav.tabs button[data-tab="create"]').click();
       toast('Using “'+c.name+'” in this bill');
     });
@@ -87,7 +88,10 @@ function renderCustomers(){
       toast("Edit customer in the modal then click Save");
     });
     tr.querySelector('[data-a="del"]').addEventListener("click",()=>{
-      if(confirm("Delete customer “"+c.name+"”?")){customers.splice(i,1);save(LS.customers,customers);renderCustomers();refreshCustPicker();}
+      if(confirm("Delete customer “"+c.name+"”?")){
+        customers.splice(i,1);save(LS.customers,customers);renderCustomers();refreshCustPicker();
+        if(c._id||c.id) deleteCustomersFromSupabase([c._id||c.id]);
+      }
     });
     body.appendChild(tr);
   });

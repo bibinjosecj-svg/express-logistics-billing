@@ -31,7 +31,10 @@ function renderBills(){
       $("print-area").innerHTML=renderBillHTML(b);window.print();
     });
     tr.querySelector('[data-a="del"]').addEventListener("click",()=>{
-      if(confirm("Delete bill "+(b.invNo || "this bill")+"?")){bills=bills.filter(x=>x.id!==b.id);save(LS.bills,bills);renderBills();}
+      if(confirm("Delete bill "+(b.invNo || "this bill")+"?")){
+        bills=bills.filter(x=>x.id!==b.id);save(LS.bills,bills);renderBills();
+        deleteBillsFromSupabase([b.id]);
+      }
     });
     body.appendChild(tr);
   });
@@ -136,6 +139,7 @@ function deleteSelectedBills(){
   save(LS.bills,bills);
   renderBills();
   toast(ids.length + ' bill(s) deleted');
+  deleteBillsFromSupabase(ids);
 }
 
 function deleteSelectedCustomers(){
@@ -147,6 +151,7 @@ function deleteSelectedCustomers(){
   refreshCustPicker();
   renderCustomers();
   toast(ids.length + ' customer(s) deleted');
+  deleteCustomersFromSupabase(ids);
 }
 
 $("deleteSelectedBillsBtn").addEventListener("click",deleteSelectedBills);

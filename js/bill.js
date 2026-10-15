@@ -91,7 +91,7 @@ function renderBillHTML(b){
       <td class="r-no">${idx+1}</td>
       <td>${i.date?fmtDate(i.date):""}</td>
       <td>${esc("9965")}</td>
-      <td>${esc(i.veh)}</td>
+      <td>${String(i.veh||"").split(/\s*,\s*/).filter(Boolean).map(v=>`<span class="nowrap">${esc(v)}</span>`).join(", ")}</td>
       <td>${esc(i.part).replace(/\n/g,"<br>")}</td>
       <td class="r-amt">${i.amt?money(i.amt):""}</td>
     </tr>`).join("");
@@ -121,32 +121,33 @@ function renderBillHTML(b){
       </div>
     </div>
     <div class="b-to">
-      <b>To,</b> ${esc(b.cust.name)}<br>
-      <span style="margin-left:40px">${esc(b.cust.addr).replace(/\n/g,"<br>")}</span><br>
+      <div class="to-row"><b>To,</b><div>${esc(b.cust.name)}<br>${esc(b.cust.addr).replace(/\n/g,"<br>")}</div></div>
       <b style="min-width:0">GSTIN :</b> ${esc(b.cust.gst)}
     </div>
     <table class="b-items">
       <thead><tr>
         <th style="width:34px">Sl.No</th><th style="width:78px">Date</th><th style="width:60px">HSN</th>
-        <th style="width:96px">Veh No</th><th>Particulars</th><th style="width:90px;text-align:right">Amount</th>
+        <th style="width:110px">Veh No</th><th>Particulars</th><th style="width:90px;text-align:right">Amount</th>
       </tr></thead>
       <tbody>
         ${itemRows}
-        <tr class="fill-space"><td colspan="6"></td></tr>
+        <tr class="fill-space"><td colspan="5"></td><td></td></tr>
         ${taxRows}
         <tr class="grand"><td colspan="5" style="text-align:right">TOTAL</td>
             <td class="r-amt">₹ ${money(t.grand)}</td></tr>
       </tbody>
     </table>
-    <div class="b-words">Rupees : ${numToWords(t.grand)}</div>
+    <div class="b-words"><span>Rupees :</span><span>${numToWords(t.grand)}</span></div>
     <div class="b-foot">
       <div class="b-bank">
-        <b>Bank details</b><br>
-        NAME&nbsp;&nbsp;&nbsp;: ${esc(s.bankName)}<br>
-        BANK&nbsp;&nbsp;&nbsp;: ${esc(s.bank)}<br>
-        BRANCH : ${esc(s.branch)}<br>
-        A/C No&nbsp;: ${esc(s.acc)}<br>
-        IFSC&nbsp;&nbsp;&nbsp;&nbsp;: ${esc(s.ifsc)}
+        <b>Bank details</b>
+        <div class="kv">
+          <span>NAME</span><span>:</span><span>${esc(s.bankName)}</span>
+          <span>BANK</span><span>:</span><span>${esc(s.bank)}</span>
+          <span>BRANCH</span><span>:</span><span>${esc(s.branch)}</span>
+          <span>A/C No</span><span>:</span><span>${esc(s.acc)}</span>
+          <span>IFSC</span><span>:</span><span>${esc(s.ifsc)}</span>
+        </div>
       </div>
       <div class="b-sign">
         <div>For ${esc(s.name)}</div>
